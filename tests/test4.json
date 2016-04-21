@@ -1,0 +1,131 @@
+{
+  "name": "test3",
+  "description": "parsing blocking css + javascript; img + onload js",
+  "objs": [
+    {
+      "id": "r1",
+      "host": "193.10.227.23:8000",
+      "path": "/dn_files/widget2.0.js",
+      "when_comp_start": 1,
+      "download": {
+        "id": "r1_d",
+        "type": "download"
+      },
+      "comps": [
+        {
+          "id": "r1_c1",
+          "type": "evalhtml",
+          "time": 500
+        },
+        {
+          "id": "r1_c2",
+          "type": "evalhtml",
+          "time": 500
+        }
+      ]
+    },
+    {
+      "id": "r2",
+      "host": "193.10.227.23:8000",
+      "path": "/dn_files/widget2.0.js",
+      "when_comp_start": -1,
+      "download": {
+        "id": "r2_d",
+        "type": "download"
+      },
+      "comps": [
+        {
+          "id": "r2_c1",
+          "type": "evalcss",
+          "time": 700
+        }
+      ]
+    },
+    {
+      "id": "r3",
+      "host": "193.10.227.23:8000",
+      "path": "/dn_files/widget2.0.js",
+      "when_comp_start": -1,
+      "download": {
+        "id": "r3_d",
+        "type": "download"
+      },
+      "comps": [
+        {
+          "id": "r3_c1",
+          "type": "evaljs",
+          "time": 200
+        }
+      ]
+    },
+    {
+      "id": "r4",
+      "host": "193.10.227.23:8000",
+      "path": "/dn_files/widget2.0.js",
+      "when_comp_start": -1,
+      "download": {
+        "id": "r4_d",
+        "type": "download"
+      },
+      "comps": [
+      ]
+    },
+    {
+      "id": "r5",
+      "host": "193.10.227.23:8000",
+      "path": "/dn_files/widget2.0.js",
+      "when_comp_start": -1,
+      "download": {
+        "id": "r5_d",
+        "type": "download"
+      },
+      "comps": [
+        {
+          "id": "r5_c1",
+          "type": "evaljs",
+          "time": 200
+        }
+      ]
+    }
+  ],
+  "deps": [
+    {
+      "id": "dep1",
+      "a1": "r1_c1",
+      "a2": "r2_d",
+      "time": 300
+    },
+    {
+      "id": "dep2",
+      "a1": "r1_c1",
+      "a2": "r3_d",
+      "time": 400
+    },
+    {
+      "id": "dep3",
+      "a1": "r2_c1",
+      "a2": "r3_c1",
+      "time": -1
+    },
+    {
+      "id": "dep4",
+      "a1": "r3_c1",
+      "a2": "r1_c2",
+      "time": -1
+    },
+    {
+      "id": "dep5",
+      "a1": "r1_c2",
+      "a2": "r4_d",
+      "time": 300
+    },
+    {
+      "id": "dep6",
+      "a1": "r1_c2",
+      "a2": "r5_d",
+      "time": -1
+    }
+  ],
+  "start_activity": "r1_d",
+  "load_activity": "r5_c1"
+}
