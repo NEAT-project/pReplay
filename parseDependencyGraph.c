@@ -38,6 +38,7 @@ CURLM *multi_handle;
 int num_transfers;
 
 int request_count=0;
+void onComplete(cJSON *obj_name);
 
 /* a handle to number lookup, highly ineffective when we do many
    transfers... */
@@ -185,59 +186,70 @@ static void setup(CURL *hnd, int num, char *url)
 
 
 
-void  request_url(char *url)
+void  *request_url(void * arg)
 {
-    int still_running; /* keep number of running handles */
+	cJSON *obj_name=arg;
+	char url[400];
+	int i=cJSON_HasArrayItem(this_objs_array,cJSON_GetObjectItem(obj_name,"obj_id")->valuestring);
+	if(i!=-1){
+			cJSON *obj= cJSON_GetArrayItem(this_objs_array, i);
+			cJSON * this_obj= cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
+			snprintf(url, sizeof url,"%s%s","https://193.10.227.23:8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
+			printf("URL: %s\n",url);		
+			//printf("when_comp_start--: %d\n",cJSON_GetObjectItem(this_obj,"when_comp_start")->valueint);
+		
+	
+			int still_running; /* keep number of running handles */
 
-    CURL *eh = curl_easy_init();
-    /* set options */
-    // setup(easy[i], i, url);
-    FILE *out;
-    char filename[128];
-    int num=0;
+			CURL *eh = curl_easy_init();
+			/* set options */
+			
+			FILE *out;
+			char filename[128];
+			int num=0;
 
-    snprintf(filename, 128, "dl-%d", num);
+			snprintf(filename, 128, "dl-%d", num);
 
-    out = fopen(filename, "wb");
+			out = fopen(filename, "wb");
 
-    // write to this file
-    curl_easy_setopt(eh, CURLOPT_WRITEDATA, out);
+			// write to this file
+			curl_easy_setopt(eh, CURLOPT_WRITEDATA, out);
 
-    /* send all data to this function  */
-    //curl_easy_setopt(hnd, CURLOPT_WRITEFUNCTION, write_data);
-
-
-    /* set the same URL */
-    curl_easy_setopt(eh, CURLOPT_URL, url);
-
-    /* send it verbose for max debuggaility */
-    //curl_easy_setopt(hnd, CURLOPT_VERBOSE, 1L);
-    //curl_easy_setopt(hnd, CURLOPT_DEBUGFUNCTION, my_trace);
-
-    /* HTTP/2 please */
-    curl_easy_setopt(eh, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0);
-
-    /* we use a self-signed test server, skip verification during debugging */
-    curl_easy_setopt(eh, CURLOPT_SSL_VERIFYPEER, 0L);
-    curl_easy_setopt(eh, CURLOPT_SSL_VERIFYHOST, 0L);
-
-#if (CURLPIPE_MULTIPLEX > 0)
-    /* wait for pipe connection to confirm */
-    curl_easy_setopt(eh, CURLOPT_PIPEWAIT, 1L);
-#endif
-
-    /* add the individual transfer */
-    curl_multi_add_handle(multi_handle, eh);
+			/* send all data to this function  */
+			//curl_easy_setopt(hnd, CURLOPT_WRITEFUNCTION, write_data);
 
 
-    curl_multi_setopt(multi_handle, CURLMOPT_PIPELINING, CURLPIPE_MULTIPLEX);
+			/* set the same URL */
+			curl_easy_setopt(eh, CURLOPT_URL, url);
+
+			/* send it verbose for max debuggaility */
+			//curl_easy_setopt(hnd, CURLOPT_VERBOSE, 1L);
+			//curl_easy_setopt(hnd, CURLOPT_DEBUGFUNCTION, my_trace);
+
+			/* HTTP/2 please */
+			curl_easy_setopt(eh, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0);
+
+			/* we use a self-signed test server, skip verification during debugging */
+			curl_easy_setopt(eh, CURLOPT_SSL_VERIFYPEER, 0L);
+			curl_easy_setopt(eh, CURLOPT_SSL_VERIFYHOST, 0L);
+
+			#if (CURLPIPE_MULTIPLEX > 0)
+			/* wait for pipe connection to confirm */
+			curl_easy_setopt(eh, CURLOPT_PIPEWAIT, 1L);
+			#endif
+
+			/* add the individual transfer */
+			curl_multi_add_handle(multi_handle, eh);
+
+
+			curl_multi_setopt(multi_handle, CURLMOPT_PIPELINING, CURLPIPE_MULTIPLEX);
     
-    pthread_mutex_lock(&lock);
+			pthread_mutex_lock(&lock);
 
-    /* we start some action by calling perform right away */
-    curl_multi_perform(multi_handle, &still_running);
+			/* we start some action by calling perform right away */
+			curl_multi_perform(multi_handle, &still_running);
 
-    do {
+			do {
         struct timeval timeout;
         int rc; /* select() return code */
         CURLMcode mc; /* curl_multi_fdset() return code */
@@ -308,7 +320,9 @@ void  request_url(char *url)
         }
     } while(still_running);
 
-pthread_mutex_unlock(&lock);
+	pthread_mutex_unlock(&lock);
+    onComplete(obj_name);
+}
 
 }
 
@@ -490,13 +504,14 @@ void createActivity(char *job_id)
 			
 			//snprintf(url, sizeof url,"%s%s%s","http://",cJSON_GetObjectItem(this_obj,"host")->valuestring,cJSON_GetObjectItem(this_obj,"path")->valuestring);
 			snprintf(url, sizeof url,"%s%s","https://193.10.227.23:8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
-			printf("URL: %s\n",url);		
-			printf("when_comp_start: %d\n",cJSON_GetObjectItem(this_obj,"when_comp_start")->valueint);
+		//	printf("URL: %s\n",url);		
+			//printf("when_comp_start: %d\n",cJSON_GetObjectItem(this_obj,"when_comp_start")->valueint);
 			easy[request_count] = curl_easy_init();
 			//request_url("https://193.10.227.23:8000/dn_files/thente66.jpg",request_count);
-            request_url(url);
+            //request_url(url);
+            pthread_create(&tid2,NULL , request_url, (void *) obj_name);
 			//request_count++;
-			onComplete(obj_name);
+			//onComplete(obj_name);
 
 
 		}
@@ -775,14 +790,12 @@ void doit(char *text)
 	
     }
 
-      printf("===[objects]");
+     /* printf("===[objects]");
 	out=cJSON_Print(this_objs_array);
-	//cJSON_Delete(this_objs);
 	printf("%s\n",out);	
 	printf("===[activities]");
 	out=cJSON_Print(this_acts_array);
-	//cJSON_Delete(this_acts);
-	printf("%s\n",out);
+	printf("%s\n",out); */
 	//free(out);
    
    //printf("start_activity:%s\n",cJSON_GetObjectItem(json,"start_activity")->valuestring); 
