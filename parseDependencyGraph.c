@@ -43,6 +43,135 @@ int protocol;
 int request_count=0;
 void onComplete(cJSON *obj_name);
 
+struct memory_chunk {
+        char *memory;
+        size_t size;
+        int enabled;
+};
+
+#define  MAX_CON 6
+
+CURL *easyh1[MAX_CON];
+
+int worker_status[MAX_CON]={0,0,0,0,0,0};
+
+
+static size_t memory_callback(void *contents, size_t size, size_t nmemb, void *userp)
+{
+	size_t realsize = size * nmemb;
+	struct memory_chunk *chunk = userp;
+	if(!chunk->enabled) return realsize;
+
+	chunk->memory = realloc(chunk->memory, chunk->size + realsize + 1);
+	if(chunk->memory == NULL) {
+		perror("realloc");
+		return 0;
+	}
+
+	memcpy(&(chunk->memory[chunk->size]), contents, realsize);
+	chunk->size += realsize;
+	chunk->memory[chunk->size] = 0;
+	return realsize;
+}
+
+int init_worker()
+{
+  int i, res;
+  for(i=0; i<MAX_CON; i++) {
+    easyh1[i] = curl_easy_init();
+    if (!easyh1[i])
+        return -1;
+    if((res = curl_easy_setopt(easyh1[i], CURLOPT_TCP_NODELAY, 1L)) != CURLE_OK) {
+		fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+	}
+	
+
+
+	/* some servers don't like requests that are made without a user-agent
+	   field, so we provide one */
+	if((res = curl_easy_setopt(easyh1[i], CURLOPT_USERAGENT, "get-http/0.1")) != CURLE_OK) {
+		fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+	}
+  }
+  return 0;
+    	
+}
+
+void *run_worker(void *arg)
+{
+	cJSON *obj_name=arg;
+	char url[400];
+	int j=cJSON_HasArrayItem(this_objs_array,cJSON_GetObjectItem(obj_name,"obj_id")->valuestring);
+	
+	if(j!=-1){
+		cJSON *obj= cJSON_GetArrayItem(this_objs_array, j);
+			cJSON * this_obj= cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
+			snprintf(url, sizeof url,"%s%s","http://193.10.227.23:8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
+			printf("URL: %s\n",url);
+	int i;
+	long response_code;
+	CURL *curl;
+	int idle_worker_found=0;
+	
+	pthread_mutex_lock(&lock);
+	while(1)
+		{
+		for(i=0; i<MAX_CON; i++) {
+			if(worker_status[i]==0){
+				idle_worker_found=1;
+				worker_status[i]=1;
+				break;
+			}
+		}
+		if (idle_worker_found==1)
+			break;
+	}
+	
+	pthread_mutex_unlock(&lock);
+	
+	struct memory_chunk chunk;
+	int res;
+	
+	if((res = curl_easy_setopt(easyh1[i], CURLOPT_WRITEFUNCTION, memory_callback)) != CURLE_OK) {
+		fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+	}
+
+
+
+	if((res = curl_easy_setopt(easyh1[i], CURLOPT_WRITEDATA, (void *)&chunk)) != CURLE_OK) {
+		fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+	}
+
+	
+	chunk.memory = NULL;
+	chunk.size = 0;
+	chunk.enabled = 0;
+	
+	char *url1="http://example.com";
+	
+	curl_easy_setopt(easyh1[i], CURLOPT_URL, url1);
+	chunk.size = 0;
+	
+	if((res=curl_easy_perform(easyh1[i])) != CURLE_OK){
+		printf("i= %d\n",i);
+		perror("Curl error");
+	}
+
+	worker_status[i]=0;
+	onComplete(obj_name);
+}
+
+}
+
+int global_array_sum()
+{
+	int i, sum=0;
+	for ( i=0; i< MAX_CON; i++){
+		sum+=worker_status[i];
+	}
+	return sum;
+}
+
 /* a handle to number lookup, highly ineffective when we do many
    transfers... */
 static int hnd2num(CURL *hnd)
@@ -489,6 +618,7 @@ void createActivity(char *job_id)
 
 	
 	struct timeval ts_s;
+	int error;
 	gettimeofday(&ts_s, NULL);
 	cJSON_AddNumberToObject(obj_name,"ts_s",((ts_s.tv_sec-start.tv_sec)*1000+(double)(ts_s.tv_usec-start.tv_usec)/1000));
 	printf("Object id: %s, type: %s started at %f ms\n",cJSON_GetObjectItem(obj_name,"obj_id")->valuestring,cJSON_GetObjectItem(obj_name,"type")->valuestring,((ts_s.tv_sec-start.tv_sec)*1000+(double)(ts_s.tv_usec-start.tv_usec)/1000));
@@ -514,6 +644,19 @@ void createActivity(char *job_id)
             //request_url(url);
             if(protocol==HTTP2)
 				pthread_create(&tid2,NULL , request_url, (void *) obj_name);
+			else if(protocol==HTTP1){
+				 while(1){
+			  if (global_array_sum()<6){ 
+		  error = pthread_create(&tid2,
+                           NULL, // default attributes please 
+                           run_worker,
+                           (void *)obj_name);
+				if(0 != error)
+					fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
+				break;	
+				}
+		  }	 
+			}
 			//request_count++;
 			//onComplete(obj_name);
 
@@ -561,6 +704,8 @@ void run()
 {
 	map_start=cJSON_CreateObject();
 	map_complete=cJSON_CreateObject();
+	if(protocol==HTTP1)
+		init_worker();
 	gettimeofday(&start, NULL);
 	createActivity(cJSON_GetObjectItem(json,"start_activity")->valuestring);
 	sleep(10);
@@ -845,6 +990,13 @@ int main (int argc, char * argv[]) {
 	}
 	if(strcmp(argv[1],"http2")==0)
 		protocol=HTTP2;
+	else if(strcmp(argv[1],"http1")==0)
+		protocol=HTTP1;
+	else{
+		printf("Not supported protocol.\n");
+		exit(0);
+	}
+	
 
 	/* init a multi stack */
 	multi_handle = curl_multi_init();
