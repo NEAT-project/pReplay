@@ -14,6 +14,8 @@ written by-- Mohd Rajiullah*/
 #include <pthread.h>
 #include "cJSON.h"
 
+#define HTTP1 1
+#define HTTP2 2
 
 void createActivity(char *job_id);
 cJSON *json, *this_objs_array, *this_acts_array,*map_start, *map_complete;
@@ -36,6 +38,7 @@ void *curl_hnd[NUM_HANDLES];
 CURL *easy[NUM_HANDLES];
 CURLM *multi_handle;
 int num_transfers;
+int protocol;
 
 int request_count=0;
 void onComplete(cJSON *obj_name);
@@ -506,10 +509,11 @@ void createActivity(char *job_id)
 			snprintf(url, sizeof url,"%s%s","https://193.10.227.23:8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
 		//	printf("URL: %s\n",url);		
 			//printf("when_comp_start: %d\n",cJSON_GetObjectItem(this_obj,"when_comp_start")->valueint);
-			easy[request_count] = curl_easy_init();
+			//easy[request_count] = curl_easy_init();
 			//request_url("https://193.10.227.23:8000/dn_files/thente66.jpg",request_count);
             //request_url(url);
-            pthread_create(&tid2,NULL , request_url, (void *) obj_name);
+            if(protocol==HTTP2)
+				pthread_create(&tid2,NULL , request_url, (void *) obj_name);
 			//request_count++;
 			//onComplete(obj_name);
 
@@ -559,7 +563,7 @@ void run()
 	map_complete=cJSON_CreateObject();
 	gettimeofday(&start, NULL);
 	createActivity(cJSON_GetObjectItem(json,"start_activity")->valuestring);
-	sleep(15);
+	sleep(10);
 	//printf("start_activity:%s\n",cJSON_GetObjectItem(json,"start_activity")->valuestring); 
 }
 
@@ -835,10 +839,13 @@ void dofile(char *filename)
 
 int main (int argc, char * argv[]) {
 	
-	if(argc !=2){
-		printf("usage: %s filename\n",argv[0]);
+	if(argc !=3){
+		printf("usage: %s protocol(http1/2) filename\n",argv[0]);
 		exit(0);
 	}
+	if(strcmp(argv[1],"http2")==0)
+		protocol=HTTP2;
+
 	/* init a multi stack */
 	multi_handle = curl_multi_init();
     if (pthread_mutex_init(&lock, NULL) != 0) {
@@ -846,7 +853,7 @@ int main (int argc, char * argv[]) {
         return 1;
     }
 
-	dofile(argv[1]);
+	dofile(argv[2]);
 
     pthread_mutex_destroy(&lock);
 
