@@ -106,8 +106,8 @@ void *run_worker(void *arg)
 	if(j!=-1){
 		cJSON *obj= cJSON_GetArrayItem(this_objs_array, j);
 			cJSON * this_obj= cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
-			snprintf(url, sizeof url,"%s%s","http://193.10.227.23:8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
-			printf("URL: %s\n",url);
+			snprintf(url, sizeof url,"%s%s","http://193.10.227.23",cJSON_GetObjectItem(this_obj,"path")->valuestring);
+			//printf("URL: %s\n",url);
 	int i;
 	long response_code;
 	CURL *curl;
@@ -147,9 +147,9 @@ void *run_worker(void *arg)
 	chunk.size = 0;
 	chunk.enabled = 0;
 	
-	char *url1="http://example.com";
+	//char *url1="http://example.com";
 	
-	curl_easy_setopt(easyh1[i], CURLOPT_URL, url1);
+	curl_easy_setopt(easyh1[i], CURLOPT_URL, url);
 	chunk.size = 0;
 	
 	if((res=curl_easy_perform(easyh1[i])) != CURLE_OK){
@@ -323,14 +323,20 @@ void  *request_url(void * arg)
 	cJSON *obj_name=arg;
 	char url[400];
 	int i=cJSON_HasArrayItem(this_objs_array,cJSON_GetObjectItem(obj_name,"obj_id")->valuestring);
+	struct timeval te;
+	double end_time;
 	if(i!=-1){
 			cJSON *obj= cJSON_GetArrayItem(this_objs_array, i);
 			cJSON * this_obj= cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
 			snprintf(url, sizeof url,"%s%s","https://193.10.227.23:8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
-			printf("URL: %s\n",url);		
+			//printf("URL: %s\n",url);		
 			//printf("when_comp_start--: %d\n",cJSON_GetObjectItem(this_obj,"when_comp_start")->valueint);
 		
-	
+
+
+			gettimeofday(&te,NULL);
+			end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
+			printf("[%f] URL: %s\n",end_time,url);
 			int still_running; /* keep number of running handles */
 
 			CURL *eh = curl_easy_init();
@@ -380,6 +386,7 @@ void  *request_url(void * arg)
 
 			/* we start some action by calling perform right away */
 			curl_multi_perform(multi_handle, &still_running);
+			pthread_mutex_unlock(&lock);
 
 			do {
         struct timeval timeout;
@@ -447,12 +454,30 @@ void  *request_url(void * arg)
             case 0:
             default:
                 /* timeout or readable/writable sockets */
+                pthread_mutex_lock(&lock);
                 curl_multi_perform(multi_handle, &still_running);
+                pthread_mutex_unlock(&lock);
                 break;
         }
     } while(still_running);
 
-	pthread_mutex_unlock(&lock);
+	
+	 double bytes,avj_obj_size;
+    long total_bytes;
+    long header_bytes;
+    double transfer_time;
+    int res;
+    
+    if((res = curl_easy_getinfo(eh, CURLINFO_SIZE_DOWNLOAD, &bytes)) != CURLE_OK ||
+				(res = curl_easy_getinfo(eh, CURLINFO_HEADER_SIZE, &header_bytes)) != CURLE_OK ||
+				(res = curl_easy_getinfo(eh, CURLINFO_TOTAL_TIME, &transfer_time)) != CURLE_OK ) {
+				fprintf(stderr, "cURL error: %s\n", curl_easy_strerror(res));
+			}
+     
+ 
+	gettimeofday(&te,NULL);
+	end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
+    printf("[%f] Object size: %ld, transfer time: %f\n", end_time, (long)bytes+header_bytes, transfer_time);
     onComplete(obj_name);
 }
 
@@ -569,10 +594,10 @@ void setTimeout(int ms)
 {
 	struct timeval ts,te;
 	gettimeofday(&ts,NULL);
-	printf("Timeout starts: %f ms \n",((ts.tv_sec-start.tv_sec)*1000+(double)(ts.tv_usec-start.tv_usec)/1000));
+	//printf("Timeout starts: %f ms \n",((ts.tv_sec-start.tv_sec)*1000+(double)(ts.tv_usec-start.tv_usec)/1000));
 	usleep(ms*1000);
 	gettimeofday(&te,NULL);
-	printf("Timeout ends: %f ms \n",((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000));
+	//printf("Timeout ends: %f ms \n",((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000));
 
 	
 }
@@ -616,9 +641,8 @@ void createActivity(char *job_id)
 				cJSON_AddNumberToObject(obj_name,"is_started",1);
 		}
 
-	
-	struct timeval ts_s;
 	int error;
+	struct timeval ts_s;
 	gettimeofday(&ts_s, NULL);
 	cJSON_AddNumberToObject(obj_name,"ts_s",((ts_s.tv_sec-start.tv_sec)*1000+(double)(ts_s.tv_usec-start.tv_usec)/1000));
 	printf("Object id: %s, type: %s started at %f ms\n",cJSON_GetObjectItem(obj_name,"obj_id")->valuestring,cJSON_GetObjectItem(obj_name,"type")->valuestring,((ts_s.tv_sec-start.tv_sec)*1000+(double)(ts_s.tv_usec-start.tv_usec)/1000));
@@ -636,7 +660,7 @@ void createActivity(char *job_id)
 			strcat(dest,cJSON_GetObjectItem(this_obj,"path")->valuestring);*/
 			
 			//snprintf(url, sizeof url,"%s%s%s","http://",cJSON_GetObjectItem(this_obj,"host")->valuestring,cJSON_GetObjectItem(this_obj,"path")->valuestring);
-			snprintf(url, sizeof url,"%s%s","https://193.10.227.23:8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
+			//snprintf(url, sizeof url,"%s%s","https://193.10.227.23:8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
 		//	printf("URL: %s\n",url);		
 			//printf("when_comp_start: %d\n",cJSON_GetObjectItem(this_obj,"when_comp_start")->valueint);
 			//easy[request_count] = curl_easy_init();
@@ -646,17 +670,16 @@ void createActivity(char *job_id)
 				pthread_create(&tid2,NULL , request_url, (void *) obj_name);
 			else if(protocol==HTTP1){
 				 while(1){
-			  if (global_array_sum()<6){ 
-		  error = pthread_create(&tid2,
-                           NULL, // default attributes please 
-                           run_worker,
-                           (void *)obj_name);
-				if(0 != error)
-					fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
-				break;	
+					if (global_array_sum()<MAX_CON){ 
+					error = pthread_create(&tid2,NULL,run_worker,(void *)obj_name);
+					if(0 != error)
+						fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
+					break;	
 				}
-		  }	 
 			}
+			 
+			}
+			else {}	
 			//request_count++;
 			//onComplete(obj_name);
 
@@ -708,7 +731,7 @@ void run()
 		init_worker();
 	gettimeofday(&start, NULL);
 	createActivity(cJSON_GetObjectItem(json,"start_activity")->valuestring);
-	sleep(10);
+	sleep(6);
 	//printf("start_activity:%s\n",cJSON_GetObjectItem(json,"start_activity")->valuestring); 
 }
 
@@ -939,7 +962,7 @@ void doit(char *text)
 	
     }
 
-     /* printf("===[objects]");
+    /*printf("===[objects]");
 	out=cJSON_Print(this_objs_array);
 	printf("%s\n",out);	
 	printf("===[activities]");
