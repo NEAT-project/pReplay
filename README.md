@@ -1,4 +1,4 @@
-./dParser Input
+./dParser http1/http2 Input
 
 Input: Http traces (Json files) collected using Wprof tool.
 Traces contain dependency graph of a web page.
@@ -14,4 +14,6 @@ dependent activities based on whether all activities
 that a dependent activity depends on are finished. 
 dParser keeps walking through the dependency graph this way until 
 all activities in the dependency graph have been visited. 
+
+dParser has been tested with curl-7.47.1
 
