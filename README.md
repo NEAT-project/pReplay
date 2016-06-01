@@ -1,4 +1,4 @@
-./dParser http1/http2 Input
+./dParser http1/https/http2 Input
 
 Input: Http traces (Json files) collected using Wprof tool.
 Traces contain dependency graph of a web page.

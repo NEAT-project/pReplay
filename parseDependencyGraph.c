@@ -16,6 +16,9 @@ written by-- Mohd Rajiullah*/
 
 #define HTTP1 1
 #define HTTP2 2
+#define HTTPS 3
+
+int debug=0;
 
 void createActivity(char *job_id);
 cJSON *json, *this_objs_array, *this_acts_array,*map_start, *map_complete;
@@ -97,6 +100,33 @@ int init_worker()
     	
 }
 
+int init_tls_worker()
+{
+  int i, res;
+  for(i=0; i<MAX_CON; i++) {
+    easyh1[i] = curl_easy_init();
+    if (!easyh1[i])
+        return -1;
+    if((res = curl_easy_setopt(easyh1[i], CURLOPT_TCP_NODELAY, 1L)) != CURLE_OK ||
+       (res = curl_easy_setopt(easyh1[i], CURLOPT_HEADER, 0L)) != CURLE_OK ||
+       (res = curl_easy_setopt(easyh1[i], CURLOPT_SSL_VERIFYPEER, 0L)) != CURLE_OK ||
+       (res = curl_easy_setopt(easyh1[i], CURLOPT_SSL_VERIFYHOST, 0L)) != CURLE_OK
+    ) {
+		fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+	}
+	
+
+
+	/* some servers don't like requests that are made without a user-agent
+	   field, so we provide one */
+	if((res = curl_easy_setopt(easyh1[i], CURLOPT_USERAGENT, "get-http/0.1")) != CURLE_OK) {
+		fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+	}
+  }
+  return 0;    	
+}
+
+
 void *run_worker(void *arg)
 {
 	cJSON *obj_name=arg;
@@ -106,8 +136,11 @@ void *run_worker(void *arg)
 	if(j!=-1){
 		cJSON *obj= cJSON_GetArrayItem(this_objs_array, j);
 			cJSON * this_obj= cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
+			if(protocol==HTTP1)
 			snprintf(url, sizeof url,"%s%s","http://193.10.227.23",cJSON_GetObjectItem(this_obj,"path")->valuestring);
-			//printf("URL: %s\n",url);
+			if(protocol==HTTPS)
+			snprintf(url, sizeof url,"%s%s","https://193.10.227.23",cJSON_GetObjectItem(this_obj,"path")->valuestring);
+			
 	int i;
 	long response_code;
 	CURL *curl;
@@ -150,6 +183,7 @@ void *run_worker(void *arg)
 	//char *url1="http://example.com";
 	
 	curl_easy_setopt(easyh1[i], CURLOPT_URL, url);
+	curl_easy_setopt(easyh1[i], CURLOPT_PRIVATE, url);
 	chunk.size = 0;
 	
 	if((res=curl_easy_perform(easyh1[i])) != CURLE_OK){
@@ -293,6 +327,7 @@ static void setup(CURL *hnd, int num, char *url)
 	/* send all data to this function  */
 	//curl_easy_setopt(hnd, CURLOPT_WRITEFUNCTION, write_data);
 
+     
 
 	/* set the same URL */
 	curl_easy_setopt(hnd, CURLOPT_URL, url);
@@ -336,7 +371,8 @@ void  *request_url(void * arg)
 
 			gettimeofday(&te,NULL);
 			end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
-			printf("[%f] URL: %s\n",end_time,url);
+			if (debug==1)
+				printf("[%f] URL: %s\n",end_time,url);
 			int still_running; /* keep number of running handles */
 
 			CURL *eh = curl_easy_init();
@@ -356,6 +392,8 @@ void  *request_url(void * arg)
 			/* send all data to this function  */
 			//curl_easy_setopt(hnd, CURLOPT_WRITEFUNCTION, write_data);
 
+             /*Nagle off please */
+			curl_easy_setopt(eh, CURLOPT_TCP_NODELAY, 1L);
 
 			/* set the same URL */
 			curl_easy_setopt(eh, CURLOPT_URL, url);
@@ -477,7 +515,8 @@ void  *request_url(void * arg)
  
 	gettimeofday(&te,NULL);
 	end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
-    printf("[%f] Object size: %ld, transfer time: %f\n", end_time, (long)bytes+header_bytes, transfer_time);
+	if (debug==1)
+		printf("[%f] Object size: %ld, transfer time: %f\n", end_time, (long)bytes+header_bytes, transfer_time);
     onComplete(obj_name);
 }
 
@@ -491,10 +530,10 @@ static int cJSON_strcasecmp(const char *s1,const char *s2)
         return tolower(*(const unsigned char *)s1) - tolower(*(const unsigned char *)s2);
 }
 
-int cJSON_HasArrayItem(cJSON *array, const char *string)
+/*int cJSON_HasArrayItem(cJSON *array, const char *string)
 {
 	int i;
-	char *out, c1, c2;
+	char *out;
     pthread_mutex_lock(&lock);
 
     for(i=0; i<cJSON_GetArraySize(array); i++)
@@ -516,6 +555,19 @@ int cJSON_HasArrayItem(cJSON *array, const char *string)
     pthread_mutex_unlock(&lock);
 
     return -1;
+}*/
+
+int cJSON_HasArrayItem(cJSON *array, const char *string)
+{
+	int i;
+    for(i=0; i<cJSON_GetArraySize(array); i++)
+		{
+		cJSON * obj= cJSON_GetArrayItem(array, i);
+		if(cJSON_HasObjectItem(obj,string)){
+			return i;}
+		}
+	return -1;
+		
 }
 
 int checkDependedActivities(char *id)
@@ -568,6 +620,7 @@ void onComplete(cJSON *obj_name)
 	double end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
 	cJSON_AddNumberToObject(obj_name,"ts_e",end_time);
 
+	//if (debug==1)
 	printf("=== [onComplete][%f] {\"id\":%s,\"type\":%s,\"is_started\":%d,\"ts_s\":%f,\"ts_e\":%f}\n",end_time,cJSON_GetObjectItem(obj_name,"id")->valuestring,cJSON_GetObjectItem(obj_name,"type")->valuestring,cJSON_GetObjectItem(obj_name,"is_started")->valueint,cJSON_GetObjectItem(obj_name,"ts_s")->valuedouble,cJSON_GetObjectItem(obj_name,"ts_e")->valuedouble);
 
 
@@ -645,6 +698,7 @@ void createActivity(char *job_id)
 	struct timeval ts_s;
 	gettimeofday(&ts_s, NULL);
 	cJSON_AddNumberToObject(obj_name,"ts_s",((ts_s.tv_sec-start.tv_sec)*1000+(double)(ts_s.tv_usec-start.tv_usec)/1000));
+	if (debug==1)
 	printf("Object id: %s, type: %s started at %f ms\n",cJSON_GetObjectItem(obj_name,"obj_id")->valuestring,cJSON_GetObjectItem(obj_name,"type")->valuestring,((ts_s.tv_sec-start.tv_sec)*1000+(double)(ts_s.tv_usec-start.tv_usec)/1000));
 	
 	if(cJSON_strcasecmp(cJSON_GetObjectItem(obj_name,"type")->valuestring,"download")==0){
@@ -668,7 +722,7 @@ void createActivity(char *job_id)
             //request_url(url);
             if(protocol==HTTP2)
 				pthread_create(&tid2,NULL , request_url, (void *) obj_name);
-			else if(protocol==HTTP1){
+			else if(protocol==HTTP1 || protocol==HTTPS){
 				 while(1){
 					if (global_array_sum()<MAX_CON){ 
 					error = pthread_create(&tid2,NULL,run_worker,(void *)obj_name);
@@ -725,13 +779,19 @@ void createActivity(char *job_id)
 
 void run()
 {
+	struct timeval end;
 	map_start=cJSON_CreateObject();
 	map_complete=cJSON_CreateObject();
 	if(protocol==HTTP1)
 		init_worker();
+	if(protocol==HTTPS)
+		init_tls_worker();
 	gettimeofday(&start, NULL);
 	createActivity(cJSON_GetObjectItem(json,"start_activity")->valuestring);
-	sleep(6);
+	sleep(10);
+	
+	//gettimeofday(&end, NULL);
+	//double end_time=((end.tv_sec-start.tv_sec)*1000+(double)(end.tv_usec-start.tv_usec)/1000);
 	//printf("start_activity:%s\n",cJSON_GetObjectItem(json,"start_activity")->valuestring); 
 }
 
@@ -1008,13 +1068,15 @@ void dofile(char *filename)
 int main (int argc, char * argv[]) {
 	
 	if(argc !=3){
-		printf("usage: %s protocol(http1/2) filename\n",argv[0]);
+		printf("usage: %s protocol(http1/s/2) filename\n",argv[0]);
 		exit(0);
 	}
 	if(strcmp(argv[1],"http2")==0)
 		protocol=HTTP2;
 	else if(strcmp(argv[1],"http1")==0)
 		protocol=HTTP1;
+	else if(strcmp(argv[1],"https")==0)
+		protocol=HTTPS;
 	else{
 		printf("Not supported protocol.\n");
 		exit(0);
