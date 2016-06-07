@@ -710,20 +710,7 @@ void createActivity(char *job_id)
 		if(i!=-1){
 			obj= cJSON_GetArrayItem(this_objs_array, i);
 			cJSON * this_obj= cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
-			//printf("Host: %s\n",cJSON_GetObjectItem(this_obj,"host")->valuestring);
-			//printf("Path: %s\n",cJSON_GetObjectItem(this_obj,"path")->valuestring);
-			/*strcat(dest,"http:/");
-			strcat(dest,cJSON_GetObjectItem(this_obj,"host")->valuestring);
-			strcat(dest,"/");
-			strcat(dest,cJSON_GetObjectItem(this_obj,"path")->valuestring);*/
-			
-			//snprintf(url, sizeof url,"%s%s%s","http://",cJSON_GetObjectItem(this_obj,"host")->valuestring,cJSON_GetObjectItem(this_obj,"path")->valuestring);
-			//snprintf(url, sizeof url,"%s%s","https://193.10.227.23:8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
-		//	printf("URL: %s\n",url);		
-			//printf("when_comp_start: %d\n",cJSON_GetObjectItem(this_obj,"when_comp_start")->valueint);
-			//easy[request_count] = curl_easy_init();
-			//request_url("https://193.10.227.23:8000/dn_files/thente66.jpg",request_count);
-            //request_url(url);
+
             if(protocol==HTTP2)
 				pthread_create(&tid2,NULL , request_url, (void *) obj_name);
 			else if(protocol==HTTP1 || protocol==HTTPS){
@@ -746,8 +733,6 @@ void createActivity(char *job_id)
 	}
 	else {
 	// For comp activity
-		//setTimeout(cJSON_GetObjectItem(obj_name,"time")->valueint);
-		//onComplete(obj_name);
 		pthread_create(&tid1,NULL , compActivity, (void *) obj_name);
 	}
 	// TO DO update task start maps
@@ -762,19 +747,15 @@ void createActivity(char *job_id)
 			if(cJSON_GetObjectItem(trigger,"time")->valueint!=-1){
 				// Check whether all activities that trigger.id depends on are finished
 				if(checkDependedActivities(cJSON_GetObjectItem(trigger,"id")->valuestring)){
-					//createActivityAfterTimeout(trigger);
 					pthread_create(&tid2,NULL , createActivityAfterTimeout, (void *) trigger);
-					//setTimeout(cJSON_GetObjectItem(trigger,"time")->valueint);
-					//createActivity(cJSON_GetObjectItem(trigger,"id")->valuestring);
+
 				}
 			}
 		}
 	}
 
 
-	/*char *out;
-	out=cJSON_Print(this_acts_array);
-	printf("%s\n",out);*/
+
 
 	}
 	
@@ -851,15 +832,7 @@ void doit(char *text)
 		cJSON_AddItemReferenceToObject(this_objs,cJSON_GetObjectItem(obj,"id")->valuestring,temp1);
 		cJSON_AddItemReferenceToArray(this_objs_array,this_objs);
 		
-		/*temp2=cJSON_CreateObject();
 	
-		cJSON_AddStringToObject(temp2,"id",cJSON_GetObjectItem(download,"id")->valuestring);
-		cJSON_AddStringToObject(temp2,"type",cJSON_GetObjectItem(download,"type")->valuestring);
-		cJSON_AddStringToObject(temp2,"obj_id",cJSON_GetObjectItem(download,"obj_id")->valuestring);
-		cJSON_AddStringToObject(temp2,"mime",cJSON_GetObjectItem(download,"mime")->valuestring);
-		this_acts=cJSON_CreateObject();
-                		
-		cJSON_AddItemReferenceToObject(this_acts,cJSON_GetObjectItem(download,"id")->valuestring,temp2);*/
 		this_acts=cJSON_CreateObject();
 		cJSON_AddItemReferenceToObject(this_acts,cJSON_GetObjectItem(download,"id")->valuestring,download);
 		cJSON_AddItemReferenceToArray(this_acts_array,this_acts);
@@ -1017,23 +990,17 @@ void doit(char *text)
 		
 	}
 
-	
-	
-	/* out=cJSON_Print(b1);
-	 printf("%s\n",out);
-	 out=cJSON_Print(b2);
-	 printf("%s\n",out);*/
-	
-	
-    }
 
-    /*printf("===[objects]");
-	out=cJSON_Print(this_objs_array);
-	printf("%s\n",out);	
-	printf("===[activities]");
-	out=cJSON_Print(this_acts_array);
-	printf("%s\n",out); */
-	//free(out);
+    }
+    if(debug==1) {
+		printf("===[objects]");
+		out=cJSON_Print(this_objs_array);
+		printf("%s\n",out);	
+		printf("===[activities]");
+		out=cJSON_Print(this_acts_array);
+		printf("%s\n",out);
+	} 
+
    
    //printf("start_activity:%s\n",cJSON_GetObjectItem(json,"start_activity")->valuestring); 
 		
