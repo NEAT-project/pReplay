@@ -23,6 +23,7 @@ double page_load_time;
 unsigned long page_size=0;
 int json_output=1;
 int object_count=0;
+int first_object=0;
 
 void createActivity(char *job_id);
 cJSON *json, *this_objs_array, *this_acts_array,*map_start, *map_complete;
@@ -218,8 +219,14 @@ void *run_worker(void *arg)
 	
 	object_count++;
 	
-    if(json_output==1)
-		printf("{%ld,%f},\n",total_bytes, transfer_time);
+    if(json_output==1){
+		if(first_object==0){
+			printf("{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
+			first_object=1;
+		}
+		else
+		     printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
+	}	
 	if (debug==1 && json_output==0)
 		printf("[%f] Object_size: %ld, transfer_time: %f\n", end_time, (long)bytes+header_bytes, transfer_time);
 	onComplete(obj_name);
@@ -551,8 +558,14 @@ void  *request_url(void * arg)
 	
 	object_count++;
 	
-	if(json_output==1)
-		printf("{%ld,%f},\n",total_bytes, transfer_time);
+	if(json_output==1){
+		if(first_object==0){
+			printf("{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
+			first_object=1;
+		}	
+		else
+		     printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
+	}
 	if (debug==1 && json_output==0)
 		printf("[%f] Object_size: %ld, transfer_time: %f\n", end_time, (long)bytes+header_bytes, transfer_time);
     onComplete(obj_name);
@@ -816,8 +829,6 @@ void run()
 	//printf("start_activity:%s\n",cJSON_GetObjectItem(json,"start_activity")->valuestring); 
 }
 
-
-/* Parse text to JSON, then render back to text, and print! */
 void doit(char *text)
 {
    cJSON *temp_obj;
