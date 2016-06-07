@@ -21,6 +21,8 @@ written by-- Mohd Rajiullah*/
 int debug=0;
 double page_load_time;
 unsigned long page_size=0;
+int json_output=1;
+int object_count=0;
 
 void createActivity(char *job_id);
 cJSON *json, *this_objs_array, *this_acts_array,*map_start, *map_complete;
@@ -214,8 +216,11 @@ void *run_worker(void *arg)
 	total_bytes=(long)bytes+header_bytes;
 	page_size+=(long)bytes;
 	
-    printf("Object_size: %ld, transfer_time: %f\n",total_bytes, transfer_time);
-	if (debug==1)
+	object_count++;
+	
+    if(json_output==1)
+		printf("{%ld,%f},\n",total_bytes, transfer_time);
+	if (debug==1 && json_output==0)
 		printf("[%f] Object_size: %ld, transfer_time: %f\n", end_time, (long)bytes+header_bytes, transfer_time);
 	onComplete(obj_name);
 }
@@ -389,7 +394,7 @@ void  *request_url(void * arg)
 			cJSON *obj= cJSON_GetArrayItem(this_objs_array, i);
 			cJSON * this_obj= cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
 			snprintf(url, sizeof url,"%s%s","https://193.10.227.23:8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
-			if (debug==1)
+			if (debug==1 && json_output==0)
 			printf("URL: %s\n",url);		
 			//printf("when_comp_start--: %d\n",cJSON_GetObjectItem(this_obj,"when_comp_start")->valueint);
 		
@@ -397,7 +402,7 @@ void  *request_url(void * arg)
 
 			gettimeofday(&te,NULL);
 			end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
-			if (debug==1)
+			if (debug==1 && json_output==0)
 				printf("[%f] URL: %s\n",end_time,url);
 			int still_running; /* keep number of running handles */
 
@@ -544,8 +549,11 @@ void  *request_url(void * arg)
 	total_bytes=(long)bytes+header_bytes;
 	page_size+=(long)bytes;
 	
-    printf("Object_size: %ld, transfer_time: %f\n",total_bytes, transfer_time);
-	if (debug==1)
+	object_count++;
+	
+	if(json_output==1)
+		printf("{%ld,%f},\n",total_bytes, transfer_time);
+	if (debug==1 && json_output==0)
 		printf("[%f] Object_size: %ld, transfer_time: %f\n", end_time, (long)bytes+header_bytes, transfer_time);
     onComplete(obj_name);
 }
@@ -728,7 +736,7 @@ void createActivity(char *job_id)
 	struct timeval ts_s;
 	gettimeofday(&ts_s, NULL);
 	cJSON_AddNumberToObject(obj_name,"ts_s",((ts_s.tv_sec-start.tv_sec)*1000+(double)(ts_s.tv_usec-start.tv_usec)/1000));
-	if (debug==1)
+	if (debug==1 && json_output==0)
 	  printf("Object id: %s, type: %s started at %f ms\n",cJSON_GetObjectItem(obj_name,"obj_id")->valuestring,cJSON_GetObjectItem(obj_name,"type")->valuestring,((ts_s.tv_sec-start.tv_sec)*1000+(double)(ts_s.tv_usec-start.tv_usec)/1000));
 	
 	if(cJSON_strcasecmp(cJSON_GetObjectItem(obj_name,"type")->valuestring,"download")==0){
@@ -800,7 +808,7 @@ void run()
 	gettimeofday(&start, NULL);
 	createActivity(cJSON_GetObjectItem(json,"start_activity")->valuestring);
 	sleep(10);
-	printf("PLT:%f page_size:%ld\n",page_load_time,page_size);
+	printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",object_count,page_load_time,page_size);
 	
 	
 	//gettimeofday(&end, NULL);
@@ -1019,7 +1027,7 @@ void doit(char *text)
 
 
     }
-    if(debug==1) {
+    if(debug==1 && json_output==0) {
 		printf("===[objects]");
 		out=cJSON_Print(this_objs_array);
 		printf("%s\n",out);	
@@ -1088,7 +1096,9 @@ int main (int argc, char * argv[]) {
         printf("\n mutex init failed\n");
         return 1;
     }
-
+    
+    if(json_output==1)
+		printf("{\"url_file\": \"%s\",\"OLT\":[",strrchr(argv[2],'/')+1);
 	dofile(argv[2]);
 
     pthread_mutex_destroy(&lock);
