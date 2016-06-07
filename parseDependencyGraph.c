@@ -19,6 +19,7 @@ written by-- Mohd Rajiullah*/
 #define HTTPS 3
 
 int debug=0;
+double page_load_time;
 
 void createActivity(char *job_id);
 cJSON *json, *this_objs_array, *this_acts_array,*map_start, *map_complete;
@@ -364,7 +365,8 @@ void  *request_url(void * arg)
 			cJSON *obj= cJSON_GetArrayItem(this_objs_array, i);
 			cJSON * this_obj= cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
 			snprintf(url, sizeof url,"%s%s","https://193.10.227.23:8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
-			//printf("URL: %s\n",url);		
+			if (debug==1)
+			printf("URL: %s\n",url);		
 			//printf("when_comp_start--: %d\n",cJSON_GetObjectItem(this_obj,"when_comp_start")->valueint);
 		
 
@@ -514,9 +516,11 @@ void  *request_url(void * arg)
      
  
 	gettimeofday(&te,NULL);
-	end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
+	page_load_time=end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
+	
+    printf("Object_size: %ld, transfer_time: %f\n",(long)bytes+header_bytes, transfer_time);
 	if (debug==1)
-		printf("[%f] Object size: %ld, transfer time: %f\n", end_time, (long)bytes+header_bytes, transfer_time);
+		printf("[%f] Object_size: %ld, transfer_time: %f\n", end_time, (long)bytes+header_bytes, transfer_time);
     onComplete(obj_name);
 }
 
@@ -620,7 +624,7 @@ void onComplete(cJSON *obj_name)
 	double end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
 	cJSON_AddNumberToObject(obj_name,"ts_e",end_time);
 
-	//if (debug==1)
+	if (debug==1)
 	printf("=== [onComplete][%f] {\"id\":%s,\"type\":%s,\"is_started\":%d,\"ts_s\":%f,\"ts_e\":%f}\n",end_time,cJSON_GetObjectItem(obj_name,"id")->valuestring,cJSON_GetObjectItem(obj_name,"type")->valuestring,cJSON_GetObjectItem(obj_name,"is_started")->valueint,cJSON_GetObjectItem(obj_name,"ts_s")->valuedouble,cJSON_GetObjectItem(obj_name,"ts_e")->valuedouble);
 
 
@@ -699,7 +703,7 @@ void createActivity(char *job_id)
 	gettimeofday(&ts_s, NULL);
 	cJSON_AddNumberToObject(obj_name,"ts_s",((ts_s.tv_sec-start.tv_sec)*1000+(double)(ts_s.tv_usec-start.tv_usec)/1000));
 	if (debug==1)
-	printf("Object id: %s, type: %s started at %f ms\n",cJSON_GetObjectItem(obj_name,"obj_id")->valuestring,cJSON_GetObjectItem(obj_name,"type")->valuestring,((ts_s.tv_sec-start.tv_sec)*1000+(double)(ts_s.tv_usec-start.tv_usec)/1000));
+	  printf("Object id: %s, type: %s started at %f ms\n",cJSON_GetObjectItem(obj_name,"obj_id")->valuestring,cJSON_GetObjectItem(obj_name,"type")->valuestring,((ts_s.tv_sec-start.tv_sec)*1000+(double)(ts_s.tv_usec-start.tv_usec)/1000));
 	
 	if(cJSON_strcasecmp(cJSON_GetObjectItem(obj_name,"type")->valuestring,"download")==0){
 		i=cJSON_HasArrayItem(this_objs_array,cJSON_GetObjectItem(obj_name,"obj_id")->valuestring);
@@ -789,6 +793,7 @@ void run()
 	gettimeofday(&start, NULL);
 	createActivity(cJSON_GetObjectItem(json,"start_activity")->valuestring);
 	sleep(10);
+	printf("PLT:%f\n",page_load_time);
 	
 	//gettimeofday(&end, NULL);
 	//double end_time=((end.tv_sec-start.tv_sec)*1000+(double)(end.tv_usec-start.tv_usec)/1000);
