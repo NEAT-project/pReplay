@@ -20,6 +20,7 @@ written by-- Mohd Rajiullah*/
 
 int debug=0;
 double page_load_time;
+unsigned long page_size=0;
 
 void createActivity(char *job_id);
 cJSON *json, *this_objs_array, *this_acts_array,*map_start, *map_complete;
@@ -193,6 +194,29 @@ void *run_worker(void *arg)
 	}
 
 	worker_status[i]=0;
+	 double bytes,avj_obj_size;
+    long total_bytes;
+    long header_bytes;
+    double transfer_time;
+    double end_time;
+    struct timeval te;
+    
+    
+    if((res = curl_easy_getinfo(easyh1[i], CURLINFO_SIZE_DOWNLOAD, &bytes)) != CURLE_OK ||
+				(res = curl_easy_getinfo(easyh1[i], CURLINFO_HEADER_SIZE, &header_bytes)) != CURLE_OK ||
+				(res = curl_easy_getinfo(easyh1[i], CURLINFO_TOTAL_TIME, &transfer_time)) != CURLE_OK ) {
+				fprintf(stderr, "cURL error: %s\n", curl_easy_strerror(res));
+			}
+     
+ 
+	gettimeofday(&te,NULL);
+	page_load_time=end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
+	total_bytes=(long)bytes+header_bytes;
+	page_size+=(long)bytes;
+	
+    printf("Object_size: %ld, transfer_time: %f\n",total_bytes, transfer_time);
+	if (debug==1)
+		printf("[%f] Object_size: %ld, transfer_time: %f\n", end_time, (long)bytes+header_bytes, transfer_time);
 	onComplete(obj_name);
 }
 
@@ -517,8 +541,10 @@ void  *request_url(void * arg)
  
 	gettimeofday(&te,NULL);
 	page_load_time=end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
+	total_bytes=(long)bytes+header_bytes;
+	page_size+=(long)bytes;
 	
-    printf("Object_size: %ld, transfer_time: %f\n",(long)bytes+header_bytes, transfer_time);
+    printf("Object_size: %ld, transfer_time: %f\n",total_bytes, transfer_time);
 	if (debug==1)
 		printf("[%f] Object_size: %ld, transfer_time: %f\n", end_time, (long)bytes+header_bytes, transfer_time);
     onComplete(obj_name);
@@ -774,7 +800,8 @@ void run()
 	gettimeofday(&start, NULL);
 	createActivity(cJSON_GetObjectItem(json,"start_activity")->valuestring);
 	sleep(10);
-	printf("PLT:%f\n",page_load_time);
+	printf("PLT:%f page_size:%ld\n",page_load_time,page_size);
+	
 	
 	//gettimeofday(&end, NULL);
 	//double end_time=((end.tv_sec-start.tv_sec)*1000+(double)(end.tv_usec-start.tv_usec)/1000);
