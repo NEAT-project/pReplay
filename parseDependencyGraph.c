@@ -240,6 +240,11 @@ void *run_worker(void *arg)
 
 }
 
+/*
+check the total number of 
+parallel connections
+*/
+ 
 int global_array_sum()
 {
 	int i, sum=0;
@@ -259,99 +264,6 @@ static int hnd2num(CURL *hnd)
 			return i;
 	}
 	return 0; /* weird, but just a fail-safe */
-}
-/*
-static size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream)
-{
-    printf ("Got it\n");
-    return 1;
-}
-*/
-
-static
-void dump(const char *text, int num, unsigned char *ptr, size_t size,
-		  char nohex)
-{
-	size_t i;
-	size_t c;
-
-	unsigned int width=0x10;
-
-	if(nohex)
-		// without the hex output, we can fit more on screen
-		width = 0x40;
-
-	fprintf(stderr, "%d %s, %ld bytes (0x%lx)\n",
-			num, text, (long)size, (long)size);
-
-	for(i=0; i<size; i+= width) {
-
-		fprintf(stderr, "%4.4lx: ", (long)i);
-
-		if(!nohex) {
-			// hex not disabled, show it
-			for(c = 0; c < width; c++)
-				if(i+c < size)
-					fprintf(stderr, "%02x ", ptr[i+c]);
-				else
-					fputs("   ", stderr);
-		}
-
-		for(c = 0; (c < width) && (i+c < size); c++) {
-			// check for 0D0A; if found, skip past and start a new line of output
-			if(nohex && (i+c+1 < size) && ptr[i+c]==0x0D && ptr[i+c+1]==0x0A) {
-				i+=(c+2-width);
-				break;
-			}
-			fprintf(stderr, "%c",
-					(ptr[i+c]>=0x20) && (ptr[i+c]<0x80)?ptr[i+c]:'.');
-			// check again for 0D0A, to avoid an extra \n if it's at width
-			if(nohex && (i+c+2 < size) && ptr[i+c+1]==0x0D && ptr[i+c+2]==0x0A) {
-				i+=(c+3-width);
-				break;
-			}
-		}
-		fputc('\n', stderr); // newline
-	}
-}
-
-static
-int my_trace(CURL *handle, curl_infotype type,
-			 char *data, size_t size,
-			 void *userp)
-{
-	const char *text;
-	int num = hnd2num(handle);
-	(void)handle; // prevent compiler warning
-	(void)userp;
-	switch (type) {
-		case CURLINFO_TEXT:
-			fprintf(stderr, "== %d Info: %s", num, data);
-		default: // in case a new one is introduced to shock us
-			return 0;
-
-		case CURLINFO_HEADER_OUT:
-			text = "=> Send header";
-			break;
-		case CURLINFO_DATA_OUT:
-			text = "=> Send data";
-			break;
-		case CURLINFO_SSL_DATA_OUT:
-			text = "=> Send SSL data";
-			break;
-		case CURLINFO_HEADER_IN:
-			text = "<= Recv header";
-			break;
-		case CURLINFO_DATA_IN:
-			text = "<= Recv data";
-			break;
-		case CURLINFO_SSL_DATA_IN:
-			text = "<= Recv SSL data";
-			break;
-	}
-
-	dump(text, num, (unsigned char *)data, size, 1);
-	return 0;
 }
 
 
@@ -587,32 +499,7 @@ static int cJSON_strcasecmp(const char *s1,const char *s2)
         return tolower(*(const unsigned char *)s1) - tolower(*(const unsigned char *)s2);
 }
 
-/*int cJSON_HasArrayItem(cJSON *array, const char *string)
-{
-	int i;
-	char *out;
-    pthread_mutex_lock(&lock);
 
-    for(i=0; i<cJSON_GetArraySize(array); i++)
-		{
-		cJSON * obj= cJSON_GetArrayItem(array, i);
-		if (!obj) {printf("Error before: [%s]\n",cJSON_GetErrorPtr());}
-		out=cJSON_Print(obj);
-		char *C1=malloc(20);
-		C1=strtok(out,":");
-		char * C2=C1+4;
-		C2[strlen(C2)-1]=0;
-		if(cJSON_strcasecmp(C2,string)==0){
-            free(C1);
-            pthread_mutex_unlock(&lock);
-            return i;
-		}
-		
-	}
-    pthread_mutex_unlock(&lock);
-
-    return -1;
-}*/
 
 int cJSON_HasArrayItem(cJSON *array, const char *string)
 {
@@ -1055,16 +942,7 @@ void doit(char *text)
 		printf("%s\n",out);
 	} 
 
-   
-   //printf("start_activity:%s\n",cJSON_GetObjectItem(json,"start_activity")->valuestring); 
-		
-    /*for(i=0; i<cJSON_GetArraySize(this_acts_array); i++)
-		{
-			cJSON * obj= cJSON_GetArrayItem(this_acts_array, i);
-			printf("......\n");
-			out=cJSON_Print(obj);
-			printf("%s\n",out);
-		}*/
+
 
 	run();
 	
