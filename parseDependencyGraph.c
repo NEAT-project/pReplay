@@ -1,7 +1,7 @@
 /* The following program is 
-used to parse dependency 
+used to replay dependency 
 trees based page load process 
-in todays browser
+in todays browser 
 
 written by-- Mohd Rajiullah*/
 
@@ -64,7 +64,8 @@ CURL *easyh1[MAX_CON];
 int worker_status[MAX_CON]={0,0,0,0,0,0};
 
 
-static size_t memory_callback(void *contents, size_t size, size_t nmemb, void *userp)
+static size_t memory_callback(void *contents, size_t size, 
+			      size_t nmemb, void *userp)
 {
 	size_t realsize = size * nmemb;
 	struct memory_chunk *chunk = userp;
@@ -89,16 +90,18 @@ int init_worker()
     easyh1[i] = curl_easy_init();
     if (!easyh1[i])
         return -1;
-    if((res = curl_easy_setopt(easyh1[i], CURLOPT_TCP_NODELAY, 1L)) != CURLE_OK) {
-		fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+    if((res = curl_easy_setopt(easyh1[i], 
+			CURLOPT_TCP_NODELAY, 1L)) != CURLE_OK) {
+	fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
 	}
 	
 
 
-	/* some servers don't like requests that are made without a user-agent
-	   field, so we provide one */
-	if((res = curl_easy_setopt(easyh1[i], CURLOPT_USERAGENT, "get-http/0.1")) != CURLE_OK) {
-		fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+    /* some servers don't like requests that are made without a user-agent
+       field, so we provide one */
+    if((res = curl_easy_setopt(easyh1[i], 
+                       CURLOPT_USERAGENT, "pReplay/0.1")) != CURLE_OK) {
+	fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
 	}
   }
   return 0;
@@ -112,20 +115,23 @@ int init_tls_worker()
     easyh1[i] = curl_easy_init();
     if (!easyh1[i])
         return -1;
-    if((res = curl_easy_setopt(easyh1[i], CURLOPT_TCP_NODELAY, 1L)) != CURLE_OK ||
-       (res = curl_easy_setopt(easyh1[i], CURLOPT_HEADER, 0L)) != CURLE_OK ||
-       (res = curl_easy_setopt(easyh1[i], CURLOPT_SSL_VERIFYPEER, 0L)) != CURLE_OK ||
-       (res = curl_easy_setopt(easyh1[i], CURLOPT_SSL_VERIFYHOST, 0L)) != CURLE_OK
-    ) {
-		fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
-	}
+    if((res = curl_easy_setopt(easyh1[i], 
+			CURLOPT_TCP_NODELAY, 1L)) != CURLE_OK ||
+       (res = curl_easy_setopt(easyh1[i], 
+			CURLOPT_HEADER, 0L)) != CURLE_OK ||
+       (res = curl_easy_setopt(easyh1[i], 
+			CURLOPT_SSL_VERIFYPEER, 0L)) != CURLE_OK ||
+       (res = curl_easy_setopt(easyh1[i], 
+			CURLOPT_SSL_VERIFYHOST, 0L)) != CURLE_OK) {
+		fprintf(stderr, "cURL option error: %s\n", 
+				curl_easy_strerror(res));
+    }
 	
-
-
-	/* some servers don't like requests that are made without a user-agent
-	   field, so we provide one */
-	if((res = curl_easy_setopt(easyh1[i], CURLOPT_USERAGENT, "get-http/0.1")) != CURLE_OK) {
-		fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+   /* some servers don't like requests that are made without a user-agent
+   field, so we provide one */
+	if((res = curl_easy_setopt(easyh1[i], CURLOPT_USERAGENT, "pReplay/0.1")) != CURLE_OK) {
+		fprintf(stderr, "cURL option error: %s\n", 
+				 curl_easy_strerror(res));
 	}
   }
   return 0;    	
@@ -401,8 +407,8 @@ void  *request_url(void * arg)
 			cJSON *obj= cJSON_GetArrayItem(this_objs_array, i);
 			cJSON * this_obj= cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
 			snprintf(url, sizeof url,"%s%s","https://193.10.227.23:8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
-			if (debug==1 && json_output==0)
-			printf("URL: %s\n",url);		
+			//if (debug==1 && json_output==0)
+			//printf("URL: %s\n",url);		
 			//printf("when_comp_start--: %d\n",cJSON_GetObjectItem(this_obj,"when_comp_start")->valueint);
 		
 
@@ -694,14 +700,16 @@ void onComplete(cJSON *obj_name)
 
 }
 
-void setTimeout(int ms)
+void setTimeout(int ms, char *s)
 {
 	struct timeval ts,te;
 	gettimeofday(&ts,NULL);
-	//printf("Timeout starts: %f ms \n",((ts.tv_sec-start.tv_sec)*1000+(double)(ts.tv_usec-start.tv_usec)/1000));
+	if (debug==1 && json_output==0)
+		printf("Timeout starts (obj id %s): %f ms \n",s,((ts.tv_sec-start.tv_sec)*1000+(double)(ts.tv_usec-start.tv_usec)/1000));
 	usleep(ms*1000);
 	gettimeofday(&te,NULL);
-	//printf("Timeout ends: %f ms \n",((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000));
+	if (debug==1 && json_output==0)
+		printf("Timeout ends (obj id %s): %f ms \n",s,((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000));
 
 	
 }
@@ -709,8 +717,8 @@ void setTimeout(int ms)
 void *compActivity(void *arg)
 {
 	cJSON *obj_name= arg;
-	//printf("Time out value: %d\n",cJSON_GetObjectItem(obj_name,"time")->valueint);
-	setTimeout(cJSON_GetObjectItem(obj_name,"time")->valueint);
+	//printf("Time out value: %d, object name: %s\n",cJSON_GetObjectItem(obj_name,"time")->valueint, cJSON_GetObjectItem(obj_name,"obj_id")->valuestring);
+	setTimeout(cJSON_GetObjectItem(obj_name,"time")->valueint, cJSON_GetObjectItem(obj_name,"obj_id")->valuestring);
 	onComplete(obj_name);
 	return ((void*)0);
 }
@@ -718,7 +726,7 @@ void *compActivity(void *arg)
 void *createActivityAfterTimeout(void *arg)
 {
 	cJSON *trigger= arg;
-	setTimeout(cJSON_GetObjectItem(trigger,"time")->valueint);
+	setTimeout(cJSON_GetObjectItem(trigger,"time")->valueint,cJSON_GetObjectItem(trigger,"id")->valuestring);
 	createActivity(cJSON_GetObjectItem(trigger,"id")->valuestring);
 	return ((void*)0);
 }

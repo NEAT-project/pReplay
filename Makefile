@@ -2,9 +2,9 @@ SRC= parseDependencyGraph.c cJSON.c
 HDRS=cJSON.h
 CPLR=gcc
 
-all:dParser
+all:pReplay
 
-dParser: $(SRC) Makefile
+pReplay: $(SRC) Makefile
 	$(CPLR) $(SRC) -lm -lpthread -lcurl -o $@
 debug: $(SRC) Makefile
 	$(CPLR) -g $(SRC) -lm -lpthread -lcurl -o $@
