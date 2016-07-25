@@ -163,9 +163,9 @@ void *run_worker(void *arg)
 		cJSON *obj= cJSON_GetArrayItem(this_objs_array, j);
 			cJSON * this_obj= cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
 			if(protocol==HTTP1)
-			snprintf(url, sizeof url,"%s%s","http://193.10.227.23",cJSON_GetObjectItem(this_obj,"path")->valuestring);
+			snprintf(url, sizeof url,"%s%s","http://10.0.4.1",cJSON_GetObjectItem(this_obj,"path")->valuestring);
 			if(protocol==HTTPS)
-			snprintf(url, sizeof url,"%s%s","https://193.10.227.23",cJSON_GetObjectItem(this_obj,"path")->valuestring);
+			snprintf(url, sizeof url,"%s%s","https://10.0.4.1",cJSON_GetObjectItem(this_obj,"path")->valuestring);
 			
 	int i;
 	long response_code;
@@ -336,7 +336,7 @@ void  *request_url(void * arg)
 	if(i!=-1){
 			cJSON *obj= cJSON_GetArrayItem(this_objs_array, i);
 			cJSON * this_obj= cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
-			snprintf(url, sizeof url,"%s%s","https://193.10.227.23:8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
+			snprintf(url, sizeof url,"%s%s","https://10.0.4.1:8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
 			//if (debug==1 && json_output==0)
 			//printf("URL: %s\n",url);		
 			//printf("when_comp_start--: %d\n",cJSON_GetObjectItem(this_obj,"when_comp_start")->valueint);
@@ -733,7 +733,7 @@ void run()
 		init_tls_worker();
 	gettimeofday(&start, NULL);
 	createActivity(cJSON_GetObjectItem(json,"start_activity")->valuestring);
-	sleep(10);
+	sleep(30);
 	printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",object_count,page_load_time,page_size);
 	
 	
@@ -999,7 +999,8 @@ int main (int argc, char * argv[]) {
 		protocol=HTTP2;
 	else if(strcmp(argv[1],"http1")==0){
 		protocol=HTTP1;
-		printf("Cookie size: %s %d", argv[2], atoi(argv[2]));
+		//printf("Cookie size: %s %d", argv[2], atoi(argv[2]));
+		printf("{\"Cookie_size\": %d,", atoi(argv[2]));
 		COOKIE_SIZE=atoi(argv[2]);
 		if(COOKIE_SIZE!=0){
 			cookie_string=malloc(sizeof(char) * COOKIE_SIZE);      
