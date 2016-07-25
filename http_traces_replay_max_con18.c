@@ -52,7 +52,7 @@ CURL *easy[NUM_HANDLES];
 CURLM *multi_handle;
 int num_transfers;
 int protocol;
-
+int COOKIE_SIZE;
 int request_count=0;
 void onComplete(cJSON *obj_name);
 
@@ -209,7 +209,8 @@ void *run_worker(void *arg)
 	
 	curl_easy_setopt(easyh1[i], CURLOPT_URL, url);
 	//curl_easy_setopt(easyh1[i], CURLOPT_COOKIEFILE, "cookie.tmp");
-	curl_easy_setopt(easyh1[i], CURLOPT_COOKIE, cookie_string);
+	if (COOKIE_SIZE!=0)	
+		curl_easy_setopt(easyh1[i], CURLOPT_COOKIE, cookie_string);
 	curl_easy_setopt(easyh1[i], CURLOPT_PRIVATE, url);
 	chunk.size = 0;
 	
@@ -992,7 +993,7 @@ int main (int argc, char * argv[]) {
 		exit(0);
 	}
 	
-	int i, COOKIE_SIZE;
+	int i;
 	if(strcmp(argv[1],"http2")==0)
 		protocol=HTTP2;
 	else if(strcmp(argv[1],"http1")==0){
