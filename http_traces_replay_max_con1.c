@@ -734,7 +734,7 @@ void run()
 		init_tls_worker();
 	gettimeofday(&start, NULL);
 	createActivity(cJSON_GetObjectItem(json,"start_activity")->valuestring);
-	sleep(40);
+	sleep(100);
 	printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",object_count,page_load_time,page_size);
 	
 	
