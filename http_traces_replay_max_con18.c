@@ -988,8 +988,9 @@ void dofile(char *filename)
 
 int main (int argc, char * argv[]) {
 	
-	if(argc !=4){
-		printf("usage: %s protocol(http1/s/2) cookie_size filename\n",argv[0]);
+	if(argc !=7){
+		printf("usage: %s protocol(http1/s/2) cookie_size no_connects rtt plr filename\n",argv[0]);
+
 		exit(0);
 	}
 	
@@ -998,8 +999,9 @@ int main (int argc, char * argv[]) {
 		protocol=HTTP2;
 	else if(strcmp(argv[1],"http1")==0){
 		protocol=HTTP1;
-		//printf("Cookie size: %s %d", argv[2], atoi(argv[2]));
-		printf("{\"Cookie_size\": %d,", atoi(argv[2]));
+		printf("{\"Cookie_size\": %d, \"no_connects\": %d, \"rtt\": %d, \"plr\": %f, ", atoi(argv[2]),atoi(argv[3]),
+                                                        atoi(argv[4]),atof(argv[5]));
+
 		COOKIE_SIZE=atoi(argv[2]);
 		if(COOKIE_SIZE!=0){
 			cookie_string=malloc(sizeof(char) * COOKIE_SIZE);      
@@ -1031,8 +1033,8 @@ int main (int argc, char * argv[]) {
     }
     
     if(json_output==1)
-		printf("{\"url_file\": \"%s\",\"OLT\":[",strrchr(argv[3],'/')+1);
-	dofile(argv[3]);
+		printf("{\"url_file\": \"%s\",\"OLT\":[",strrchr(argv[6],'/')+1);
+	dofile(argv[6]);
 
     pthread_mutex_destroy(&lock);
 
