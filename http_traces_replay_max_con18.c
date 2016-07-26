@@ -1033,7 +1033,7 @@ int main (int argc, char * argv[]) {
     }
     
     if(json_output==1)
-		printf("{\"url_file\": \"%s\",\"OLT\":[",strrchr(argv[6],'/')+1);
+		printf("\"url_file\": \"%s\",\"OLT\":[",strrchr(argv[6],'/')+1);
 	dofile(argv[6]);
 
     pthread_mutex_destroy(&lock);
