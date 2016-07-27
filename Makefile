@@ -1,14 +1,14 @@
-SRC=  http_traces_replay_max_con6.c cJSON.c
+SRC=  parseDependencyGraph.c cJSON.c
 HDRS=cJSON.h
 CPLR=gcc
 
-all:pReplay6
+all:pReplay
 
-pReplay6: $(SRC) Makefile
+pReplay: $(SRC) Makefile
 	$(CPLR) $(SRC) -lm -lpthread -lcurl -o $@
 debug: $(SRC) Makefile
 	$(CPLR) -g $(SRC) -lm -lpthread -lcurl -o $@
 	
 
 clean:
-	rm -rf pReplay6	 
+	rm -rf pReplay
