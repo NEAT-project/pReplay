@@ -1,7 +1,7 @@
 SRC=parseDependencyGraph.c cJSON.c
 HDRS=cJSON.h
-CPLR=CC
-CPFL=-std=c99 -pedantic -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable
+CPLR=cc
+CPFL=-std=c99 -pedantic -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-variable -D_POSIX_C_SOURCE=199309L
 BNAME=pReplay
 
 pReplay: $(SRC) Makefile

@@ -5,13 +5,17 @@ in todays browser
 
 written by-- Mohd Rajiullah*/
 
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 #include <sys/time.h>
-#include <unistd.h>
 #include <ctype.h>
 #include <pthread.h>
+#include <unistd.h>
+
 #include "cJSON.h"
 
 #define HTTP1 1
@@ -564,7 +568,11 @@ onComplete(cJSON *obj_name)
 void
 setTimeout(int ms, char *s)
 {
-    struct timeval ts,te;
+    struct timeval ts;
+    struct timeval te;
+    struct timespec tim;
+    struct timespec tim2;
+
     gettimeofday(&ts,NULL);
     if (debug == 1 && json_output == 0) {
         printf("Timeout starts (obj id %s): %f ms \n",
@@ -572,7 +580,10 @@ setTimeout(int ms, char *s)
             ((ts.tv_sec - start.tv_sec) * 1000 + (double)(ts.tv_usec - start.tv_usec) / 1000));
     }
 
-    usleep(ms * 1000);
+    tim.tv_sec = ms / 1000;
+    tim.tv_nsec = (ms % 1000) * 10000000;
+    nanosleep(&tim, &tim2);
+
     gettimeofday(&te, NULL);
     if (debug == 1 && json_output == 0) {
         printf("Timeout ends (obj id %s): %f ms \n",
