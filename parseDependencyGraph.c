@@ -989,7 +989,7 @@ int main (int argc, char * argv[]) {
         }
         char ch = '0';
 
-        for (i = 0; i < COOKIE_SIZE; i++) {
+        for (i = 0; i < COOKIE_SIZE - 1; i++) {
             cookie_string[i] = ch;
             if (ch == '9') {
                 ch = '0';
@@ -997,7 +997,7 @@ int main (int argc, char * argv[]) {
                 ch++;
             }
         }
-        cookie_string[COOKIE_SIZE]='\n';
+        cookie_string[COOKIE_SIZE - 1]='\n';
     } else if(strcmp(argv[1],"https") == 0) {
         protocol = HTTPS;
     } else {
