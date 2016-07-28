@@ -26,7 +26,7 @@ unsigned long page_size = 0;
 int json_output = 1;
 int object_count = 0;
 int first_object = 0;
-char * cookie_string;
+char *cookie_string;
 
 void createActivity(char *job_id);
 int cJSON_HasArrayItem(cJSON *array, const char *string);
@@ -961,7 +961,9 @@ int main (int argc, char * argv[]) {
     } else if(strcmp(argv[1],"http1") == 0) {
         protocol = HTTP1;
         printf("{\"Cookie_size\": %d,", atoi(argv[2]));
-        cookie_string = malloc(sizeof(char) * COOKIE_SIZE);
+        if ((cookie_string = malloc(sizeof(char) * COOKIE_SIZE)) == NULL) {
+            perror("malloc");
+        }
         char ch = '0';
 
         for (i = 0; i < COOKIE_SIZE; i++) {
