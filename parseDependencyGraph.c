@@ -17,13 +17,16 @@ written by-- Mohd Rajiullah*/
 #define HTTP1 1
 #define HTTP2 2
 #define HTTPS 3
+#define COOKIE_SIZE 512
 
-int debug=0;
+
+int debug = 0;
 double page_load_time;
-unsigned long page_size=0;
-int json_output=1;
-int object_count=0;
-int first_object=0;
+unsigned long page_size = 0;
+int json_output = 1;
+int object_count = 0;
+int first_object = 0;
+char * cookie_string;
 
 void createActivity(char *job_id);
 int cJSON_HasArrayItem(cJSON *array, const char *string);
@@ -49,7 +52,7 @@ CURLM *multi_handle;
 int num_transfers;
 int protocol;
 
-int request_count=0;
+int request_count = 0;
 void onComplete(cJSON *obj_name);
 
 struct memory_chunk {
@@ -201,6 +204,8 @@ run_worker(void *arg)
         //char *url1="http://example.com";
 
         curl_easy_setopt(easyh1[i], CURLOPT_URL, url);
+        //curl_easy_setopt(easyh1[i], CURLOPT_COOKIEFILE, "cookie.tmp");
+        curl_easy_setopt(easyh1[i], CURLOPT_COOKIE, cookie_string);
         curl_easy_setopt(easyh1[i], CURLOPT_PRIVATE, url);
         chunk.size = 0;
 
@@ -943,9 +948,11 @@ dofile(char *filename)
 
 
 int main (int argc, char * argv[]) {
+    int i;
 
-    if (argc !=3){
-        printf("usage: %s protocol(http1/s/2) filename\n", argv[0]);
+
+    if (argc !=4){
+        printf("usage: %s protocol(http1/s/2) cookie_size filename\n", argv[0]);
         exit(0);
     }
 
@@ -953,6 +960,19 @@ int main (int argc, char * argv[]) {
         protocol = HTTP2;
     } else if(strcmp(argv[1],"http1") == 0) {
         protocol = HTTP1;
+        printf("{\"Cookie_size\": %d,", atoi(argv[2]));
+        cookie_string = malloc(sizeof(char) * COOKIE_SIZE);
+        char ch = '0';
+
+        for (i = 0; i < COOKIE_SIZE; i++) {
+            cookie_string[i] = ch;
+            if (ch == '9') {
+                ch = '0';
+            } else {
+                ch++;
+            }
+        }
+        cookie_string[COOKIE_SIZE]='\n';
     } else if(strcmp(argv[1],"https") == 0) {
         protocol = HTTPS;
     } else {
@@ -969,10 +989,10 @@ int main (int argc, char * argv[]) {
     }
 
     if (json_output == 1) {
-        printf("{\"url_file\": \"%s\",\"OLT\":[", strrchr(argv[2], '/')+1);
+        printf("\"url_file\": \"%s\",\"OLT\":[", strrchr(argv[3], '/') + 1);
     }
 
-    dofile(argv[2]);
+    dofile(argv[3]);
     pthread_mutex_destroy(&lock);
     return 0;
 }
