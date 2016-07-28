@@ -997,7 +997,7 @@ int main (int argc, char * argv[]) {
                 ch++;
             }
         }
-        cookie_string[COOKIE_SIZE - 1]='\n';
+        cookie_string[COOKIE_SIZE - 1]='\0';
     } else if(strcmp(argv[1],"https") == 0) {
         protocol = HTTPS;
     } else {
