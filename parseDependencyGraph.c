@@ -878,7 +878,7 @@ doit(char *text)
             out = cJSON_Print(obj);
             //printf("%s\n",out);
 
-            char *Cidd = malloc(20);
+            char *Cidd;// = malloc(20);
             //sprintf(Cid,"%.9s",out);
             Cidd = strtok(out, ":");
             char* Cid = Cidd+4;
