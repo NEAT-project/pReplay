@@ -727,6 +727,19 @@ doit(char *text)
    json = cJSON_Parse(text);
    int i,j;
    char *out, *a1, *a2;
+   char *dep_id;
+   int deps_length;
+   cJSON *comp;
+   cJSON *this_objs;
+   cJSON *temp1;
+   cJSON *temp2;
+   cJSON *this_acts;
+   cJSON *comps;
+   cJSON *root;
+   cJSON *b1;
+   cJSON *b2;
+   cJSON *temp;
+   cJSON *temp_array;
 
    if (!json) {
        printf("Error before: [%s]\n",cJSON_GetErrorPtr());
@@ -746,7 +759,7 @@ doit(char *text)
 
    this_objs_array = cJSON_CreateArray();
    this_acts_array = cJSON_CreateArray();
-   cJSON *this_objs, *temp1, *temp2, *this_acts, *comps, *root, *b1, *b2, *temp, *temp_array;
+
 
    for(i = 0; i < cJSON_GetArraySize(objs); i++)
         {
@@ -789,7 +802,7 @@ doit(char *text)
         printf("||||||\n"); */
 
          for (j = 0; j < cJSON_GetArraySize(comps); j++) {
-            cJSON * comp = cJSON_GetArrayItem(comps, j);
+            comp = cJSON_GetArrayItem(comps, j);
             cJSON_AddStringToObject(comp, "obj_id",cJSON_GetObjectItem(obj, "id")->valuestring);
              /*Add natural dependency
                      Depends on download activity
@@ -801,9 +814,8 @@ doit(char *text)
             }
 
             root = cJSON_CreateObject();
-            int deps_length = cJSON_GetArraySize(deps);
-            char dep_id[6];
-            sprintf(dep_id, "dep%d", deps_length+1);
+            deps_length = cJSON_GetArraySize(deps);
+            asprintf(&dep_id, "dep%d", deps_length+1);
             cJSON_AddStringToObject(root, "id", dep_id);
             cJSON_AddStringToObject(root, "a1", a1);
             cJSON_AddStringToObject(root, "a2", cJSON_GetObjectItem(comp, "id")-> valuestring);
