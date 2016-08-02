@@ -699,6 +699,7 @@ createActivity(char *job_id)
                     // Check whether all activities that trigger.id depends on are finished
                     if (checkDependedActivities(cJSON_GetObjectItem(trigger, "id")->valuestring)){
                         pthread_create(&tid2, NULL, createActivityAfterTimeout, (void *) trigger);
+                        pthread_detach(tid2);
                     }
                 }
             }
@@ -827,7 +828,7 @@ doit(char *text)
 
             root = cJSON_CreateObject();
             deps_length = cJSON_GetArraySize(deps);
-	    snprintf(dep_id, 16, "dep%d", deps_length+1);
+            snprintf(dep_id, 16, "dep%d", deps_length+1);
             cJSON_AddStringToObject(root, "id", dep_id);
             cJSON_AddStringToObject(root, "a1", a1);
             cJSON_AddStringToObject(root, "a2", cJSON_GetObjectItem(comp, "id")-> valuestring);
