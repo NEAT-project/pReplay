@@ -24,7 +24,7 @@ written by-- Mohd Rajiullah*/
 #define COOKIE_SIZE 512
 
 
-int debug = 0;
+int debug = 1;
 double page_load_time;
 unsigned long page_size = 0;
 int json_output = 1;
@@ -235,23 +235,23 @@ run_worker(void *arg)
 
         object_count++;
 
-        if (json_output == 1){
+        if (json_output == 1) {
             if (first_object == 0) {
                 printf("{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
                 first_object = 1;
             } else {
                 printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
             }
-
-            if (debug==1 && json_output==0) {
-                printf("[%f] Object_size: %ld, transfer_time: %f\n",
-                    end_time,
-                    (long)bytes+header_bytes,
-                    transfer_time);
-            }
-
-            onComplete(obj_name);
         }
+
+        if (debug == 1) {
+            fprintf(stderr, "[%f] Object_size: %ld, transfer_time: %f\n",
+                end_time,
+                (long)bytes + header_bytes,
+                transfer_time);
+        }
+
+        onComplete(obj_name);
     }
     return 0;
 }
@@ -663,10 +663,13 @@ createActivity(char *job_id)
 
                 if (protocol == HTTP2) {
                     pthread_create(&tid2, NULL, request_url, (void *) obj_name);
+                    pthread_detach(tid2);
                 } else if(protocol == HTTP1 || protocol == HTTPS){
                      while(1){
                         if (global_array_sum() < MAX_CON) {
                             error = pthread_create(&tid2,NULL,run_worker,(void *)obj_name);
+                            pthread_detach(tid2);
+                            printf("pthread c\n");
                             if (0 != error) {
                                 fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
                             }
@@ -681,6 +684,8 @@ createActivity(char *job_id)
         } else {
         // For comp activity
             pthread_create(&tid1, NULL, compActivity, (void *) obj_name);
+            pthread_detach(tid1);
+            printf("pthread b\n");
         }
         // TO DO update task start maps
         if (!cJSON_HasObjectItem(map_start, cJSON_GetObjectItem(obj_name, "id")->valuestring)) {
@@ -696,6 +701,7 @@ createActivity(char *job_id)
                     // Check whether all activities that trigger.id depends on are finished
                     if (checkDependedActivities(cJSON_GetObjectItem(trigger, "id")->valuestring)){
                         pthread_create(&tid2, NULL, createActivityAfterTimeout, (void *) trigger);
+                        printf("pthread a\n");
                     }
                 }
             }
@@ -753,24 +759,22 @@ doit(char *text)
    cJSON *temp_array;
 
    if (!json) {
-       printf("Error before: [%s]\n",cJSON_GetErrorPtr());
+       printf("Error before: [%s]\n", cJSON_GetErrorPtr());
    }
 
 
    cJSON *objs = cJSON_GetObjectItem(json, "objs");
    if (!objs) {
-       printf("Error before: [%s]\n",cJSON_GetErrorPtr());
+       printf("Error before: [%s]\n", cJSON_GetErrorPtr());
    }
 
-   cJSON *deps=cJSON_GetObjectItem(json,"deps");
+   cJSON *deps = cJSON_GetObjectItem(json,"deps");
    if (!deps) {
-       printf("Error before: [%s]\n",cJSON_GetErrorPtr());
+       printf("Error before: [%s]\n", cJSON_GetErrorPtr());
    }
-
 
    this_objs_array = cJSON_CreateArray();
    this_acts_array = cJSON_CreateArray();
-
 
    for(i = 0; i < cJSON_GetArraySize(objs); i++)
         {
@@ -812,7 +816,7 @@ doit(char *text)
         printf("%s\n",out);
         printf("||||||\n"); */
 
-         for (j = 0; j < cJSON_GetArraySize(comps); j++) {
+        for (j = 0; j < cJSON_GetArraySize(comps); j++) {
             comp = cJSON_GetArrayItem(comps, j);
             cJSON_AddStringToObject(comp, "obj_id",cJSON_GetObjectItem(obj, "id")->valuestring);
              /*Add natural dependency
@@ -878,7 +882,7 @@ doit(char *text)
             out = cJSON_Print(obj);
             //printf("%s\n",out);
 
-            char *Cidd;// = malloc(20);
+            char *Cidd;
             //sprintf(Cid,"%.9s",out);
             Cidd = strtok(out, ":");
             char* Cid = Cidd+4;
@@ -906,9 +910,9 @@ doit(char *text)
         temp_array = cJSON_CreateArray();
         cJSON_AddStringToObject(temp, "id", cJSON_GetObjectItem(b1, "id")->valuestring);
         cJSON_AddNumberToObject(temp, "time", cJSON_GetObjectItem(dep, "time")->valueint);
-
         if (cJSON_HasObjectItem(b2,"deps")) {
             cJSON_AddItemReferenceToArray(cJSON_GetObjectItem(b2, "deps"),temp);
+            free(temp_array);
         } else {
             cJSON_AddItemToArray(temp_array, temp);
             cJSON_AddItemReferenceToObject(b2, "deps", temp_array);
@@ -921,21 +925,22 @@ doit(char *text)
 
         if (cJSON_HasObjectItem(b1, "triggers")) {
             cJSON_AddItemReferenceToArray(cJSON_GetObjectItem(b1, "triggers"), temp);
+            free(temp_array);
         } else {
             cJSON_AddItemToArray(temp_array, temp);
             cJSON_AddItemReferenceToObject(b1,"triggers", temp_array);
         }
-
-
     }
     if (debug == 1 && json_output == 0) {
         printf("===[objects]");
         out = cJSON_Print(this_objs_array);
         printf("%s\n", out);
+        free(out);
 
         printf("===[activities]");
         out=cJSON_Print(this_acts_array);
         printf("%s\n", out);
+        free(out);
     }
 
     run();
