@@ -4,8 +4,8 @@ trees based page load process
 in todays browser
 
 written by-- Mohd Rajiullah*/
+#define _XOPEN_SOURCE 700
 
-#define _GNU_SOURCE
 
 #include <stdio.h>
 #include <string.h>
@@ -744,7 +744,7 @@ doit(char *text)
    json = cJSON_Parse(text);
    int i,j;
    char *out, *a1, *a2;
-   char *dep_id;
+   char dep_id[16];
    int deps_length;
    cJSON *comp;
    cJSON *this_objs;
@@ -830,7 +830,7 @@ doit(char *text)
 
             root = cJSON_CreateObject();
             deps_length = cJSON_GetArraySize(deps);
-            asprintf(&dep_id, "dep%d", deps_length+1);
+	    snprintf(dep_id, 16, "dep%d", deps_length+1);
             cJSON_AddStringToObject(root, "id", dep_id);
             cJSON_AddStringToObject(root, "a1", a1);
             cJSON_AddStringToObject(root, "a2", cJSON_GetObjectItem(comp, "id")-> valuestring);
