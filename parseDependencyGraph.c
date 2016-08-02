@@ -669,7 +669,6 @@ createActivity(char *job_id)
                         if (global_array_sum() < MAX_CON) {
                             error = pthread_create(&tid2,NULL,run_worker,(void *)obj_name);
                             pthread_detach(tid2);
-                            printf("pthread c\n");
                             if (0 != error) {
                                 fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
                             }
@@ -685,7 +684,6 @@ createActivity(char *job_id)
         // For comp activity
             pthread_create(&tid1, NULL, compActivity, (void *) obj_name);
             pthread_detach(tid1);
-            printf("pthread b\n");
         }
         // TO DO update task start maps
         if (!cJSON_HasObjectItem(map_start, cJSON_GetObjectItem(obj_name, "id")->valuestring)) {
@@ -701,7 +699,6 @@ createActivity(char *job_id)
                     // Check whether all activities that trigger.id depends on are finished
                     if (checkDependedActivities(cJSON_GetObjectItem(trigger, "id")->valuestring)){
                         pthread_create(&tid2, NULL, createActivityAfterTimeout, (void *) trigger);
-                        printf("pthread a\n");
                     }
                 }
             }
@@ -803,12 +800,12 @@ doit(char *text)
         cJSON_AddItemReferenceToObject(temp1, "comps",comps);
 
         this_objs = cJSON_CreateObject();
-        cJSON_AddItemReferenceToObject(this_objs, cJSON_GetObjectItem(obj, "id")->valuestring, temp1);
-        cJSON_AddItemReferenceToArray(this_objs_array, this_objs);
+        cJSON_AddItemToObject(this_objs, cJSON_GetObjectItem(obj, "id")->valuestring, temp1);
+        cJSON_AddItemToArray(this_objs_array, this_objs);
 
         this_acts=cJSON_CreateObject();
-        cJSON_AddItemReferenceToObject(this_acts,cJSON_GetObjectItem(download,"id")->valuestring,download);
-        cJSON_AddItemReferenceToArray(this_acts_array,this_acts);
+        cJSON_AddItemToObject(this_acts,cJSON_GetObjectItem(download,"id")->valuestring,download);
+        cJSON_AddItemToArray(this_acts_array,this_acts);
 
 
         /* printf("||||||\n");
@@ -835,7 +832,7 @@ doit(char *text)
             cJSON_AddStringToObject(root, "a1", a1);
             cJSON_AddStringToObject(root, "a2", cJSON_GetObjectItem(comp, "id")-> valuestring);
             cJSON_AddNumberToObject(root, "time", -1);
-            cJSON_AddItemReferenceToArray(deps,root);
+            cJSON_AddItemToArray(deps,root);
              //out=cJSON_Print(deps);
 
             temp2 = cJSON_CreateObject();
@@ -857,8 +854,8 @@ doit(char *text)
 
             this_acts = cJSON_CreateObject();
 
-            cJSON_AddItemReferenceToObject(this_acts, cJSON_GetObjectItem(comp, "id")->valuestring,temp2);
-            cJSON_AddItemReferenceToArray(this_acts_array, this_acts);
+            cJSON_AddItemToObject(this_acts, cJSON_GetObjectItem(comp, "id")->valuestring,temp2);
+            cJSON_AddItemToArray(this_acts_array, this_acts);
         }
     }
 
@@ -911,11 +908,11 @@ doit(char *text)
         cJSON_AddStringToObject(temp, "id", cJSON_GetObjectItem(b1, "id")->valuestring);
         cJSON_AddNumberToObject(temp, "time", cJSON_GetObjectItem(dep, "time")->valueint);
         if (cJSON_HasObjectItem(b2,"deps")) {
-            cJSON_AddItemReferenceToArray(cJSON_GetObjectItem(b2, "deps"),temp);
+            cJSON_AddItemToArray(cJSON_GetObjectItem(b2, "deps"),temp);
             free(temp_array);
         } else {
             cJSON_AddItemToArray(temp_array, temp);
-            cJSON_AddItemReferenceToObject(b2, "deps", temp_array);
+            cJSON_AddItemToObject(b2, "deps", temp_array);
         }
 
         temp = cJSON_CreateObject();
@@ -924,11 +921,11 @@ doit(char *text)
         cJSON_AddNumberToObject(temp, "time", cJSON_GetObjectItem(dep, "time")->valueint);
 
         if (cJSON_HasObjectItem(b1, "triggers")) {
-            cJSON_AddItemReferenceToArray(cJSON_GetObjectItem(b1, "triggers"), temp);
+            cJSON_AddItemToArray(cJSON_GetObjectItem(b1, "triggers"), temp);
             free(temp_array);
         } else {
             cJSON_AddItemToArray(temp_array, temp);
-            cJSON_AddItemReferenceToObject(b1,"triggers", temp_array);
+            cJSON_AddItemToObject(b1,"triggers", temp_array);
         }
     }
     if (debug == 1 && json_output == 0) {
@@ -1024,5 +1021,6 @@ int main (int argc, char * argv[]) {
 
     dofile(argv[3]);
     pthread_mutex_destroy(&lock);
+    //cJSON_Delete(json);
     return 0;
 }
