@@ -59,6 +59,8 @@ typedef struct cJSON_Hooks {
       void (*free_fn)(void *ptr);
 } cJSON_Hooks;
 
+extern int cJSON_strcasecmp(const char *s1,const char *s2);
+ 
 /* Supply malloc, realloc and free functions to cJSON */
 extern void cJSON_InitHooks(cJSON_Hooks* hooks);
 
