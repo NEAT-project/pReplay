@@ -6,58 +6,31 @@ in todays browser
 written by-- Mohd Rajiullah*/
 #define _XOPEN_SOURCE 700
 
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
-#include <sys/time.h>
 #include <ctype.h>
 #include <pthread.h>
 #include <unistd.h>
-
+#include <curl/curl.h>
+#include <sys/time.h>
 #include "cJSON.h"
 
 #define HTTP1 1
 #define HTTP2 2
 #define HTTPS 3
 #define COOKIE_SIZE 512
-
-
-int debug = 1;
-double page_load_time;
-unsigned long page_size = 0;
-int json_output = 1;
-int object_count = 0;
-int first_object = 0;
-char *cookie_string;
-
-void createActivity(char *job_id);
-int cJSON_HasArrayItem(cJSON *array, const char *string);
-cJSON *json, *this_objs_array, *this_acts_array,*map_start, *map_complete;
-struct timeval start;
-pthread_mutex_t lock;
-
-/* curl stuff */
-#include <curl/curl.h>
+#define NUM_HANDLES 1000
+#define MAX_CON 6
 
 #ifndef CURLPIPE_MULTIPLEX
 /* This little trick will just make sure that we don't enable pipelining for
-   libcurls old enough to not have this symbol. It is _not_ defined to zero in
-   a recent libcurl header. */
+ * libcurls old enough to not have this symbol. It is _not_ defined to zero in
+ * a recent libcurl header.
+ */
 #define CURLPIPE_MULTIPLEX 0
 #endif
-
-#define NUM_HANDLES 1000
-
-void *curl_hnd[NUM_HANDLES];
-CURL *easy[NUM_HANDLES];
-CURLM *multi_handle;
-int num_transfers;
-int protocol;
-
-int request_count = 0;
-void onComplete(cJSON *obj_name);
 
 struct memory_chunk {
     char *memory;
@@ -65,11 +38,35 @@ struct memory_chunk {
     int enabled;
 };
 
-#define  MAX_CON 6
+void createActivity(char *job_id);
+int cJSON_HasArrayItem(cJSON *array, const char *string);
+void onComplete(cJSON *obj_name);
 
+int debug = 1;
+double page_load_time = 0.0;
+unsigned long page_size = 0;
+int json_output = 1;
+int object_count = 0;
+int first_object = 0;
+char *cookie_string;
+int cookie_size = COOKIE_SIZE;
+char *server = NULL;
+char *testfile = NULL;
+cJSON *json = NULL;
+cJSON *this_objs_array = NULL;
+cJSON *this_acts_array = NULL;
+cJSON *map_start = NULL;
+cJSON *map_complete = NULL;
+struct timeval start;
+pthread_mutex_t lock;
+void *curl_hnd[NUM_HANDLES];
+CURL *easy[NUM_HANDLES];
+CURLM *multi_handle = NULL;
+int num_transfers = 0;
+int protocol = HTTP1;
+int request_count = 0;
 CURL *easyh1[MAX_CON];
-
-int worker_status[MAX_CON]={0, 0, 0, 0, 0, 0};
+int worker_status[MAX_CON] = {0, 0, 0, 0, 0, 0};
 
 static size_t
 memory_callback(void *contents, size_t size, size_t nmemb, void *userp)
@@ -124,6 +121,7 @@ init_tls_worker()
 {
     int i;
     int res;
+
     for (i = 0; i < MAX_CON; i++) {
         easyh1[i] = curl_easy_init();
         if (!easyh1[i]) {
@@ -172,9 +170,9 @@ run_worker(void *arg)
         this_obj= cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
 
         if (protocol==HTTP1) {
-            snprintf(url, sizeof(url),"%s%s","http://193.10.227.23",cJSON_GetObjectItem(this_obj, "path")->valuestring);
+            snprintf(url, sizeof(url), "%s%s%s", "http://", server, cJSON_GetObjectItem(this_obj, "path")->valuestring);
         } else if (protocol==HTTPS) {
-            snprintf(url, sizeof(url),"%s%s","https://193.10.227.23",cJSON_GetObjectItem(this_obj, "path")->valuestring);
+            snprintf(url, sizeof(url), "%s%s%s", "https://", server, cJSON_GetObjectItem(this_obj, "path")->valuestring);
         }
 
         pthread_mutex_lock(&lock);
@@ -312,7 +310,7 @@ request_url(void * arg)
         int res = 0;
 
 
-        snprintf(url, sizeof url,"%s%s","https://193.10.227.23:8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
+        snprintf(url, sizeof url,"%s%s%s%s","https://", server, ":8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
         //if (debug==1 && json_output==0)
         //printf("URL: %s\n",url);
         //printf("when_comp_start--: %d\n",cJSON_GetObjectItem(this_obj,"when_comp_start")->valueint);
@@ -975,52 +973,65 @@ dofile(char *filename)
 
 int main (int argc, char * argv[]) {
     int i;
+    char ch;
 
 
-    if (argc !=4){
-        printf("usage: %s protocol(http1/s/2) cookie_size filename\n", argv[0]);
-        exit(0);
+    if (argc < 3 || argc > 5){
+        fprintf(stderr,"usage: %s server testfile [http|https|http2] [cookie-size]\n", argv[0]);
+        exit(EXIT_FAILURE);
     }
 
-    if (strcmp(argv[1], "http2") == 0) {
-        protocol = HTTP2;
-    } else if(strcmp(argv[1],"http1") == 0) {
-        protocol = HTTP1;
-        printf("{\"Cookie_size\": %d,", atoi(argv[2]));
-        if ((cookie_string = malloc(sizeof(char) * COOKIE_SIZE)) == NULL) {
-            perror("malloc");
-        }
-        char ch = '0';
+    server = argv[1];
+    testfile = argv[2];
 
-        for (i = 0; i < COOKIE_SIZE - 1; i++) {
-            cookie_string[i] = ch;
-            if (ch == '9') {
-                ch = '0';
-            } else {
-                ch++;
-            }
+    /* User defined a protocol via arguments - HTTP1 is default */
+    if (argc > 3) {
+        if (strcmp(argv[2], "http2") == 0) {
+            protocol = HTTP2;
+        } else if(strcmp(argv[2],"http") == 0) {
+            protocol = HTTP1;
+        } else if(strcmp(argv[1],"https") == 0) {
+            protocol = HTTPS;
+        } else {
+            printf("Not supported protocol.\n");
+            exit(EXIT_FAILURE);
         }
-        cookie_string[COOKIE_SIZE - 1]='\0';
-    } else if(strcmp(argv[1],"https") == 0) {
-        protocol = HTTPS;
-    } else {
-        printf("Not supported protocol.\n");
-        exit(0);
     }
 
+    /* User defined cookie size */
+    if (argc > 4) {
+        if ((cookie_size = strtol(argv[2], NULL, 10)) == 0) {
+            fprintf(stderr, "cookie-size invalid or 0\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    /* Prepare cookie */
+    if ((cookie_string = malloc(sizeof(char) * cookie_size)) == NULL) {
+        perror("malloc");
+    }
+
+    /* 30 (ascii) == 0 */
+    ch = 30;
+
+    for (i = 0; i < cookie_size - 1; i++) {
+        ch = ((ch + 1) % 10) + 30;
+        cookie_string[i] = ch;
+    }
+    cookie_string[cookie_size - 1]='\0';
 
     /* init a multi stack */
     multi_handle = curl_multi_init();
     if (pthread_mutex_init(&lock, NULL) != 0) {
-        printf("\n mutex init failed\n");
-        return 1;
+        fprintf(stderr, "mutex init failed\n");
+        exit(EXIT_FAILURE);
     }
 
     if (json_output == 1) {
-        printf("\"url_file\": \"%s\",\"OLT\":[", strrchr(argv[3], '/') + 1);
+        printf("\"url_file\": \"%s\",\"OLT\":[", strrchr(testfile, '/') + 1);
     }
 
-    dofile(argv[3]);
+    dofile(testfile);
     pthread_mutex_destroy(&lock);
     //cJSON_Delete(json);
     return 0;
