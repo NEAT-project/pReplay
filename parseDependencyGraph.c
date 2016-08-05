@@ -10,6 +10,7 @@ written by-- Mohd Rajiullah*/
 #include <stdlib.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <time.h>
 #include <ctype.h>
 #include <pthread.h>
 #include "cJSON.h"
@@ -22,10 +23,10 @@ written by-- Mohd Rajiullah*/
 #define COOKIE_SIZE 512
 
 
-int debug=0;
+int debug=1;
 double page_load_time;
 unsigned long page_size=0;
-int json_output=1;
+int json_output=0;
 int object_count=0;
 int first_object=0;
 
@@ -158,20 +159,19 @@ run_worker(void *arg)
 	cJSON *obj_name=arg;
 	char url[400];
 	long response_code;
-	CURL *curl;
 	int idle_worker_found=0;
 	int j=cJSON_HasArrayItem(this_objs_array,cJSON_GetObjectItem(obj_name,"obj_id")->valuestring);
 	cJSON *obj;
 	cJSON *this_obj;
 	int i;
 	struct memory_chunk chunk;
-	int res;
-	double bytes;
-	double avj_obj_size;
-	long total_bytes;
-	long header_bytes;
-	double transfer_time;
-	double end_time;
+	int res=0;
+	double bytes=0;
+	double avj_obj_size=0;
+	long total_bytes=0;
+	long header_bytes=0;
+	double transfer_time=0;
+	double end_time=0;
 	struct timeval te;
 
 	if(j!=-1){
@@ -235,7 +235,9 @@ run_worker(void *arg)
 
 
 		gettimeofday(&te,NULL);
+		pthread_mutex_lock(&lock);
 		page_load_time=end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
+		pthread_mutex_unlock(&lock);
 		total_bytes=(long)bytes+header_bytes;
 		page_size+=(long)bytes;
 
@@ -299,23 +301,22 @@ request_url(void * arg)
 	char url[400];
 	int i=cJSON_HasArrayItem(this_objs_array,cJSON_GetObjectItem(obj_name,"obj_id")->valuestring);
 	struct timeval te;
-	double end_time;
-	FILE *out;
-	char filename[128];
-	int num=0;
-	int still_running; /* keep number of running handles */
-	CURL *eh;
-	double bytes,avj_obj_size;
-	long total_bytes;
-	long header_bytes;
-	double transfer_time;
-	int res;
-
+	double end_time=0.0;
 	if(i!=-1){
 		cJSON *obj= cJSON_GetArrayItem(this_objs_array, i);
 		cJSON * this_obj= cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
 		snprintf(url, sizeof url,"%s%s","https://193.10.227.23:8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
 
+	FILE *out;
+	char filename[128];
+	int num=0;
+	int still_running; /* keep number of running handles */
+	CURL *eh;
+	double bytes,avj_obj_size=0.0;
+	long total_bytes=0;
+	long header_bytes=0;
+	double transfer_time=0.0;
+	int res=0;
 
 	gettimeofday(&te,NULL);
 	end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
@@ -451,7 +452,9 @@ request_url(void * arg)
 
 
 	gettimeofday(&te,NULL);
+	pthread_mutex_lock(&lock);
 	page_load_time=end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
+	pthread_mutex_unlock(&lock);
 	total_bytes=(long)bytes+header_bytes;
 	page_size+=(long)bytes;
 
@@ -540,7 +543,9 @@ onComplete(cJSON *obj_name)
 	int i;
 	double end_time;
 	gettimeofday(&te,NULL);
-	end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
+	pthread_mutex_lock(&lock);
+	page_load_time=end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
+	pthread_mutex_unlock(&lock);
 	cJSON_AddNumberToObject(obj_name,"ts_e",end_time);
 
 	if (debug==1){
@@ -579,14 +584,25 @@ setTimeout(int ms, char *s)
 {
 	struct timeval ts;
 	struct timeval te;
+	struct timespec wait;
+
 	gettimeofday(&ts,NULL);
 
 	if (debug==1 && json_output==0)
-		printf("Timeout starts (obj id %s): %f ms \n",s,((ts.tv_sec-start.tv_sec)*1000+(double)(ts.tv_usec-start.tv_usec)/1000));
+		printf("Timeout starts (obj id %s): %f ms \n",
+				s,
+				((ts.tv_sec-start.tv_sec)*1000+(double)(ts.tv_usec-start.tv_usec)/1000));
 		usleep(ms*1000);
+		
+    		//wait.tv_sec = ms / 1000;
+    		//wait.tv_nsec = (ms % 1000) * 10000000;
+    		//nanosleep(&wait, NULL);
+
 		gettimeofday(&te,NULL);
 		if (debug==1 && json_output==0){
-			printf("Timeout ends (obj id %s): %f ms \n",s,((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000));
+			printf("Timeout ends (obj id %s): %f ms \n",
+				s,
+				((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000));
 		}
 
 }
@@ -716,7 +732,7 @@ run()
 	}
 	gettimeofday(&start, NULL);
 	createActivity(cJSON_GetObjectItem(json,"start_activity")->valuestring);
-	sleep(10);
+	sleep(5);
 	printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",object_count,page_load_time,page_size);
 
 		
