@@ -18,16 +18,17 @@ written by-- Mohd Rajiullah*/
 #define HTTP2 2
 #define HTTPS 3
 
-int debug=1;
+int debug=0;
 double page_load_time;
 unsigned long page_size=0;
-int json_output=0;
+int json_output=1;
 int object_count=0;
 int first_object=0;
 
 char * cookie_string;
 int COOKIE_SIZE;
 void createActivity(char *job_id);
+int cJSON_HasArrayItem(cJSON *array, const char *string);
 cJSON *json, *this_objs_array, *this_acts_array,*map_start, *map_complete;
 struct timeval start;
 pthread_mutex_t lock;
@@ -224,7 +225,9 @@ void *run_worker(void *arg)
      
  
 	gettimeofday(&te,NULL);
+	pthread_mutex_lock(&lock);
 	page_load_time=end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
+	pthread_mutex_unlock(&lock);
 	total_bytes=(long)bytes+header_bytes;
 	page_size+=(long)bytes;
 	
@@ -475,7 +478,9 @@ void  *request_url(void * arg)
      
  
 	gettimeofday(&te,NULL);
+	pthread_mutex_lock(&lock);
 	page_load_time=end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
+	pthread_mutex_unlock(&lock);
 	total_bytes=(long)bytes+header_bytes;
 	page_size+=(long)bytes;
 	
@@ -565,8 +570,11 @@ void onComplete(cJSON *obj_name)
 {
 	struct timeval te;
 	int i;
+	double end_time;
 	gettimeofday(&te,NULL);
-	double end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
+	pthread_mutex_lock(&lock);
+	page_load_time=end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
+	pthread_mutex_unlock(&lock);
 	cJSON_AddNumberToObject(obj_name,"ts_e",end_time);
 
 	if (debug==1)
@@ -1016,8 +1024,9 @@ int main (int argc, char * argv[]) {
         return 1;
     }
     
-    if(json_output==1)
-		printf("{\"url_file\": \"%s\",\"OLT\":[",strrchr(argv[3],'/')+1);
+	if(json_output==1){
+		printf("\"url_file\": \"%s\",\"OLT\":[",strrchr(argv[3],'/')+1);
+	}
 	dofile(argv[3]);
 
     pthread_mutex_destroy(&lock);
