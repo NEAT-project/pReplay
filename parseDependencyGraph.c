@@ -1028,7 +1028,11 @@ int main (int argc, char * argv[]) {
     }
 
     if (json_output == 1) {
-        printf("\"url_file\": \"%s\",\"OLT\":[", strrchr(testfile, '/') + 1);
+        if (strrchr(testfile, '/') == NULL) {
+            printf("\"url_file\": \"%s\",\"OLT\":[", testfile);
+        } else {
+            printf("\"url_file\": \"%s\",\"OLT\":[", strrchr(testfile, '/') + 1);
+        }
     }
 
     dofile(testfile);
