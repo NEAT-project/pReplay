@@ -1015,14 +1015,8 @@ int main (int argc, char * argv[]) {
         perror("malloc");
     }
 
-    /* 30 (ascii) == 0 */
-    ch = 30;
-
-    for (i = 0; i < cookie_size - 1; i++) {
-        ch = ((ch + 1) % 10) + 30;
-        cookie_string[i] = ch;
-    }
-    cookie_string[cookie_size - 1]='\0';
+    memset(cookie_string, 97, cookie_size);
+    cookie_string[cookie_size - 1] = '\0';
 
     /* init a multi stack */
     multi_handle = curl_multi_init();
