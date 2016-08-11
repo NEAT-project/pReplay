@@ -5,7 +5,7 @@ CPFL=-std=c99 -pedantic -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-v
 BNAME=pReplay
 
 pReplay: $(SRC) Makefile
-	$(CPLR) $(CPFL) $(SRC) -lm -lpthread -lcurl -o $(BNAME)
+	$(CPLR) $(CPFL) -g $(SRC) -lm -lpthread -lcurl -o $(BNAME)
 debug: $(SRC) Makefile
 	$(CPLR) $(CPFL) -g -O0 $(SRC) -lm -lpthread -lcurl -o $(BNAME)
 clean:
