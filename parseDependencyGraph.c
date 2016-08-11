@@ -23,6 +23,7 @@ written by-- Mohd Rajiullah*/
 #define COOKIE_SIZE 512
 #define NUM_HANDLES 1000
 #define MAX_CON 6
+#define NANOSLEEP_MS_MULTIPLIER  1000000  // 1 millisecond = 1,000,000 Nanoseconds
 
 #ifndef CURLPIPE_MULTIPLEX
 /* This little trick will just make sure that we don't enable pipelining for
@@ -45,7 +46,7 @@ void onComplete(cJSON *obj_name);
 int debug = 1;
 double page_load_time = 0.0;
 unsigned long page_size = 0;
-int json_output = 1;
+int json_output = 0;
 int object_count = 0;
 int first_object = 0;
 char *cookie_string;
@@ -573,20 +574,23 @@ setTimeout(int ms, char *s)
 
     gettimeofday(&ts,NULL);
     if (debug == 1 && json_output == 0) {
-        printf("Timeout starts (obj id %s): %f ms \n",
+        printf("Timeout starts (obj id %s): %f ms - sleeping for %d ms\n",
             s,
-            ((ts.tv_sec - start.tv_sec) * 1000 + (double)(ts.tv_usec - start.tv_usec) / 1000));
+            ((ts.tv_sec - start.tv_sec) * 1000 + (double)(ts.tv_usec - start.tv_usec) / 1000),
+            ms
+        );
     }
 
-    tim.tv_sec = ms / 1000;
-    tim.tv_nsec = (ms % 1000) * 10000000;
+    tim.tv_sec = 0;
+    tim.tv_nsec = ms * NANOSLEEP_MS_MULTIPLIER;
     nanosleep(&tim, &tim2);
 
     gettimeofday(&te, NULL);
     if (debug == 1 && json_output == 0) {
         printf("Timeout ends (obj id %s): %f ms \n",
             s,
-            ((te.tv_sec - start.tv_sec) * 1000 + (double)(te.tv_usec - start.tv_usec) / 1000));
+            ((te.tv_sec - start.tv_sec) * 1000 + (double)(te.tv_usec - start.tv_usec) / 1000)
+        );
     }
 }
 
