@@ -261,7 +261,7 @@ run_worker(void *arg)
 
         onComplete(obj_name);
 	pthread_mutex_lock(&count_mutex);
-	if (first_download==0){		
+	if (first_download==0){
 		first_download=1;
 	}else{
 		thread_count--;
@@ -270,7 +270,7 @@ run_worker(void *arg)
 		printf("BECOME 0 in run_worker\n");
 		fflush(stdout);
 	}*/
-	
+
 	if(thread_count==0){
 		pthread_cond_signal(&count_threshold_cv);
 	}
@@ -497,7 +497,7 @@ request_url(void * arg)
 
         onComplete(obj_name);
 	pthread_mutex_lock(&count_mutex);
-	if (first_download==0){		
+	if (first_download==0){
 		first_download=1;
 	}else{
 		thread_count--;
@@ -506,7 +506,7 @@ request_url(void * arg)
 		printf("BECOME 0 in request_url\n");
 			fflush(stdout);
 	}*/
-	
+
 	if(thread_count==0){
 		pthread_cond_signal(&count_threshold_cv);
 	}
@@ -672,7 +672,7 @@ void
      }
      if(thread_count==0){
      	pthread_cond_signal(&count_threshold_cv);
-      }	
+      }
      pthread_mutex_unlock(&count_mutex);
     return ((void*)0);
 }
@@ -733,11 +733,11 @@ createActivity(char *job_id)
                     	pthread_detach(tid2);
 		    }else{
 			pthread_mutex_lock(&count_mutex);
-			thread_count++;	
+			thread_count++;
 			pthread_mutex_unlock(&count_mutex);
                     	pthread_create(&tid2, NULL, request_url, (void *) obj_name);
                     	pthread_detach(tid2);
-		    }	
+		    }
                 } else if(protocol == HTTP1 || protocol == HTTPS){
                   	while(1){
                         	if (global_array_sum() < MAX_CON) {
@@ -749,9 +749,9 @@ createActivity(char *job_id)
 						}
 					}else{
 						pthread_mutex_lock(&count_mutex);
-						thread_count++;	
+						thread_count++;
 						pthread_mutex_unlock(&count_mutex);
-						error = pthread_create(&tid2,NULL,run_worker,(void *)obj_name); 
+						error = pthread_create(&tid2,NULL,run_worker,(void *)obj_name);
 						pthread_detach(tid2);
 						if(0 != error){
 							fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
@@ -762,12 +762,12 @@ createActivity(char *job_id)
                     }
 
                 }
-           
+
             }
         } else {
         // For comp activity
 		pthread_mutex_lock(&count_mutex);
-		thread_count++;	
+		thread_count++;
 		pthread_mutex_unlock(&count_mutex);
             	pthread_create(&tid1, NULL, compActivity, (void *) obj_name);
             	pthread_detach(tid1);
@@ -786,7 +786,7 @@ createActivity(char *job_id)
                     // Check whether all activities that trigger.id depends on are finished
                     if (checkDependedActivities(cJSON_GetObjectItem(trigger, "id")->valuestring)){
 			pthread_mutex_lock(&count_mutex);
-			thread_count++;	
+			thread_count++;
 			pthread_mutex_unlock(&count_mutex);
                         pthread_create(&tid2, NULL, createActivityAfterTimeout, (void *) trigger);
                         pthread_detach(tid2);
@@ -812,13 +812,13 @@ run()
 		init_tls_worker();
 	}
 	gettimeofday(&start, NULL);
-	
+
 	pthread_mutex_init(&count_threshold_mutex, NULL);
 	pthread_mutex_lock(&count_threshold_mutex);
-	
+
 	createActivity(cJSON_GetObjectItem(json,"start_activity")->valuestring);
-	
-	
+
+
 	/*printf("Start to wait...\n");
 	fflush(stdout);*/
 	pthread_cond_wait(&count_threshold_cv,&count_threshold_mutex);
@@ -828,12 +828,12 @@ run()
         object_count,
         page_load_time,
         page_size);
-	
-	//pthread_create(&thd,NULL,watch_threads, (void *) thread_ids);	
+
+	//pthread_create(&thd,NULL,watch_threads, (void *) thread_ids);
 	//sleep(5);
 	//printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",object_count,page_load_time,page_size);
-	
-	
+
+
 }
 
 void
@@ -1103,10 +1103,7 @@ int main (int argc, char * argv[]) {
 
     /* User defined cookie size */
     if (argc > 4) {
-        if ((cookie_size = strtol(argv[4], NULL, 10)) == 0) {
-            fprintf(stderr, "cookie-size invalid or 0\n");
-            exit(EXIT_FAILURE);
-        }
+        cookie_size = strtol(argv[4], NULL, 10);
     }
 
     /* Prepare cookie */
