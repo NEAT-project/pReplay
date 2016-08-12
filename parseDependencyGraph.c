@@ -1089,11 +1089,11 @@ int main (int argc, char * argv[]) {
 
     /* User defined a protocol via arguments - HTTP1 is default */
     if (argc > 3) {
-        if (strcmp(argv[2], "http2") == 0) {
+        if (strcmp(argv[3], "http2") == 0) {
             protocol = HTTP2;
-        } else if(strcmp(argv[2],"http") == 0) {
+        } else if(strcmp(argv[3],"http") == 0) {
             protocol = HTTP1;
-        } else if(strcmp(argv[1],"https") == 0) {
+        } else if(strcmp(argv[3],"https") == 0) {
             protocol = HTTPS;
         } else {
             printf("Not supported protocol.\n");
@@ -1103,7 +1103,7 @@ int main (int argc, char * argv[]) {
 
     /* User defined cookie size */
     if (argc > 4) {
-        if ((cookie_size = strtol(argv[2], NULL, 10)) == 0) {
+        if ((cookie_size = strtol(argv[4], NULL, 10)) == 0) {
             fprintf(stderr, "cookie-size invalid or 0\n");
             exit(EXIT_FAILURE);
         }
