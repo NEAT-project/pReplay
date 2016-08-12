@@ -625,8 +625,8 @@ setTimeout(int ms, char *s)
         );
     }
 
-    tim.tv_sec = 0;
-    tim.tv_nsec = ms * NANOSLEEP_MS_MULTIPLIER;
+    tim.tv_sec = ms / 1000;
+    tim.tv_nsec = (ms % 1000) * NANOSLEEP_MS_MULTIPLIER;
     nanosleep(&tim, &tim2);
 
     gettimeofday(&te, NULL);
