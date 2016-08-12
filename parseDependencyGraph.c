@@ -573,6 +573,9 @@ onComplete(cJSON *obj_name)
     int i = 0;
     gettimeofday(&te, NULL);
     double end_time = ((te.tv_sec - start.tv_sec) * 1000 + (double)(te.tv_usec - start.tv_usec) / 1000);
+    pthread_mutex_lock(&lock);
+    page_load_time=end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
+    pthread_mutex_unlock(&lock);
     cJSON_AddNumberToObject(obj_name, "ts_e", end_time);
 
     if (debug == 1) {
@@ -816,11 +819,11 @@ run()
 	createActivity(cJSON_GetObjectItem(json,"start_activity")->valuestring);
 	
 	
-	printf("Start to wait...\n");
-	fflush(stdout);
+	/*printf("Start to wait...\n");
+	fflush(stdout);*/
 	pthread_cond_wait(&count_threshold_cv,&count_threshold_mutex);
-	printf("After waiting...\n");
-	fflush(stdout);
+	/*printf("After waiting...\n");
+	fflush(stdout);*/
 	printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",
         object_count,
         page_load_time,
