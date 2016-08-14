@@ -29,7 +29,7 @@ int first_download=0;
 #define HTTPS 3
 #define COOKIE_SIZE 512
 #define NUM_HANDLES 1000
-#define MAX_CON 6
+#define EASY_HANDLES 100
 #define NANOSLEEP_MS_MULTIPLIER  1000000  // 1 millisecond = 1,000,000 Nanoseconds
 
 #ifndef CURLPIPE_MULTIPLEX
@@ -73,8 +73,11 @@ CURLM *multi_handle = NULL;
 int num_transfers = 0;
 int protocol = HTTP1;
 int request_count = 0;
-CURL *easyh1[MAX_CON];
-int worker_status[MAX_CON] = {0, 0, 0, 0, 0, 0};
+int MAX_CON;
+CURL *easyh1[EASY_HANDLES];
+//CURL *easyh1;
+int *worker_status;
+//int worker_status[MAX_CON] = {0, 0, 0, 0, 0, 0};
 
 static size_t
 memory_callback(void *contents, size_t size, size_t nmemb, void *userp)
@@ -1079,8 +1082,8 @@ int main (int argc, char * argv[]) {
     char ch;
 
 
-    if (argc < 3 || argc > 5){
-        fprintf(stderr,"usage: %s server testfile [http|https|http2] [cookie-size]\n", argv[0]);
+    if (argc < 3 || argc > 6){
+        fprintf(stderr,"usage: %s server testfile [http|https|http2] [max-connections][cookie-size]\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
@@ -1101,9 +1104,28 @@ int main (int argc, char * argv[]) {
         }
     }
 
+    /* User defined max parallel conn */
+    if (argc >4){
+	MAX_CON=strtol(argv[4], NULL, 10);
+	if(MAX_CON<1){
+		printf("Invalid number of connections\n");
+		exit(EXIT_FAILURE);
+	}
+	worker_status = malloc (MAX_CON * sizeof (worker_status[0]));
+	for(int i=0;i<MAX_CON;i++){
+                worker_status[i]=0;
+        }
+    }else{
+	MAX_CON=6;
+	worker_status = malloc (MAX_CON * sizeof (worker_status[0]));
+	for(int i=0;i<MAX_CON;i++){
+                worker_status[i]=0;
+	}
+     }
+
     /* User defined cookie size */
-    if (argc > 4) {
-        cookie_size = strtol(argv[4], NULL, 10);
+    if (argc > 5) {
+        cookie_size = strtol(argv[5], NULL, 10);
     }
 
     /* Prepare cookie */
