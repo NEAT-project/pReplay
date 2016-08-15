@@ -1,6 +1,7 @@
-usage: ./pReplay protocol(http1/s/2) cookie_size filename
+usage: ./pReplay server testfile [http|https|http2] [max-connections][cookie-size]
+
 (currently cookie works with http1 only)
-Input: Http traces (Json files) collected using Wprof tool.
+Input: Test file, Http traces (Json files) collected using Wprof tool.
 Traces contain dependency graph of a web page.
 
 pReplay replays the dependency graph. It starts from the 
