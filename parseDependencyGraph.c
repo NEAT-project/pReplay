@@ -73,11 +73,11 @@ CURLM *multi_handle = NULL;
 int num_transfers = 0;
 int protocol = HTTP1;
 int request_count = 0;
-int MAX_CON;
+int max_con = 0;
 CURL *easyh1[EASY_HANDLES];
 //CURL *easyh1;
 int *worker_status;
-//int worker_status[MAX_CON] = {0, 0, 0, 0, 0, 0};
+//int worker_status[max_con] = {0, 0, 0, 0, 0, 0};
 
 static size_t
 memory_callback(void *contents, size_t size, size_t nmemb, void *userp)
@@ -107,7 +107,7 @@ init_worker()
     int i;
     int res;
 
-    for (i = 0; i < MAX_CON; i++) {
+    for (i = 0; i < max_con; i++) {
         easyh1[i] = curl_easy_init();
         if (!easyh1[i]) {
             return -1;
@@ -133,7 +133,7 @@ init_tls_worker()
     int i;
     int res;
 
-    for (i = 0; i < MAX_CON; i++) {
+    for (i = 0; i < max_con; i++) {
         easyh1[i] = curl_easy_init();
         if (!easyh1[i]) {
             return -1;
@@ -188,7 +188,7 @@ run_worker(void *arg)
 
         pthread_mutex_lock(&lock);
         while(1) {
-            for (i = 0; i < MAX_CON; i++) {
+            for (i = 0; i < max_con; i++) {
                 if (worker_status[i] == 0){
                     idle_worker_found = 1;
                     worker_status[i] = 1;
@@ -205,7 +205,7 @@ run_worker(void *arg)
             fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
         }
 
-        if((res = curl_easy_setopt(easyh1[i], CURLOPT_WRITEDATA, (void *)&chunk)) != CURLE_OK) {
+        if ((res = curl_easy_setopt(easyh1[i], CURLOPT_WRITEDATA, (void *)&chunk)) != CURLE_OK) {
             fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
         }
 
@@ -237,12 +237,12 @@ run_worker(void *arg)
         }
 
 
-	gettimeofday(&te,NULL);
-	pthread_mutex_lock(&lock);
-	page_load_time=end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
-	pthread_mutex_unlock(&lock);
-	total_bytes=(long)bytes+header_bytes;
-	page_size+=(long)bytes;
+    gettimeofday(&te,NULL);
+    pthread_mutex_lock(&lock);
+    page_load_time=end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
+    pthread_mutex_unlock(&lock);
+    total_bytes=(long)bytes+header_bytes;
+    page_size+=(long)bytes;
 
         object_count++;
 
@@ -263,21 +263,21 @@ run_worker(void *arg)
         }
 
         onComplete(obj_name);
-	pthread_mutex_lock(&count_mutex);
-	if (first_download==0){
-		first_download=1;
-	}else{
-		thread_count--;
-	}
-	/*if(thread_count==0){
-		printf("BECOME 0 in run_worker\n");
-		fflush(stdout);
-	}*/
+    pthread_mutex_lock(&count_mutex);
+    if (first_download==0){
+        first_download=1;
+    }else{
+        thread_count--;
+    }
+    /*if (thread_count==0){
+        printf("BECOME 0 in run_worker\n");
+        fflush(stdout);
+    }*/
 
-	if(thread_count==0){
-		pthread_cond_signal(&count_threshold_cv);
-	}
-	pthread_mutex_unlock(&count_mutex);
+    if (thread_count==0){
+        pthread_cond_signal(&count_threshold_cv);
+    }
+    pthread_mutex_unlock(&count_mutex);
     }
     return 0;
 }
@@ -292,7 +292,7 @@ global_array_sum()
 {
     int i = 0;
     int sum = 0;
-    for (i = 0; i < MAX_CON; i++){
+    for (i = 0; i < max_con; i++){
         sum += worker_status[i];
     }
     return sum;
@@ -304,8 +304,8 @@ static int
 hnd2num(CURL *hnd)
 {
     int i;
-    for(i=0; i< num_transfers; i++){
-        if(curl_hnd[i] == hnd) {
+    for (i=0; i< num_transfers; i++){
+        if (curl_hnd[i] == hnd) {
             return i;
         }
     }
@@ -418,7 +418,7 @@ request_url(void * arg)
             curl_multi_timeout(multi_handle, &curl_timeo);
             if (curl_timeo >= 0) {
                 timeout.tv_sec = curl_timeo / 1000;
-                if(timeout.tv_sec > 1) {
+                if (timeout.tv_sec > 1) {
                     timeout.tv_sec = 1;
                 } else {
                     timeout.tv_usec = (curl_timeo % 1000) * 1000;
@@ -453,7 +453,6 @@ request_url(void * arg)
                    If you need access to the original value save a copy beforehand. */
                 rc = select(maxfd+1, &fdread, &fdwrite, &fdexcep, &timeout);
             }
-
                 switch (rc) {
                     case -1:
                         /* select error */
@@ -478,15 +477,15 @@ request_url(void * arg)
 
 
         gettimeofday(&te, NULL);
-	pthread_mutex_lock(&lock);
+        pthread_mutex_lock(&lock);
         page_load_time = end_time= ((te.tv_sec - start.tv_sec) * 1000 + (double)(te.tv_usec - start.tv_usec) / 1000);
-	pthread_mutex_unlock(&lock);
+        pthread_mutex_unlock(&lock);
         total_bytes = (long)bytes + header_bytes;
         page_size += (long)bytes;
 
         object_count++;
 
-        if (json_output == 1){
+        if (json_output == 1) {
             if (first_object==0){
                 printf("{\"S\":%ld,\"T\":%f}", total_bytes, transfer_time);
                 first_object = 1;
@@ -499,21 +498,22 @@ request_url(void * arg)
         }
 
         onComplete(obj_name);
-	pthread_mutex_lock(&count_mutex);
-	if (first_download==0){
-		first_download=1;
-	}else{
-		thread_count--;
-	}
-	/*if(thread_count==0){
-		printf("BECOME 0 in request_url\n");
-			fflush(stdout);
-	}*/
+        pthread_mutex_lock(&count_mutex);
 
-	if(thread_count==0){
-		pthread_cond_signal(&count_threshold_cv);
-	}
-	pthread_mutex_unlock(&count_mutex);
+        if (first_download == 0) {
+            first_download = 1;
+        } else {
+            thread_count--;
+        }
+        /*if (thread_count==0){
+            printf("BECOME 0 in request_url\n");
+                fflush(stdout);
+        }*/
+
+        if (thread_count == 0){
+            pthread_cond_signal(&count_threshold_cv);
+        }
+        pthread_mutex_unlock(&count_mutex);
     }
     return 0;
 }
@@ -541,11 +541,11 @@ checkDependedActivities(char *id)
         cJSON * objs = cJSON_GetArrayItem(this_acts_array, i);
         cJSON * obj = cJSON_GetObjectItem(objs, id);
         cJSON *deps = cJSON_GetObjectItem(obj, "deps");
-        for(j = 0; j < cJSON_GetArraySize(deps); j++){
+        for (j = 0; j < cJSON_GetArraySize(deps); j++){
             cJSON * dep = cJSON_GetArrayItem(deps, j);
             if (cJSON_GetObjectItem(dep, "time")->valueint < 0) {
                 if (cJSON_HasObjectItem(map_complete, cJSON_GetObjectItem(dep, "id")->valuestring)) {
-                    if(cJSON_GetObjectItem(map_complete, cJSON_GetObjectItem(dep, "id")->valuestring)->valueint != 1) {
+                    if (cJSON_GetObjectItem(map_complete, cJSON_GetObjectItem(dep, "id")->valuestring)->valueint != 1) {
                         is_all_complete = 0;
                         break;
                     }
@@ -601,7 +601,7 @@ onComplete(cJSON *obj_name)
         cJSON *triggers = cJSON_GetObjectItem(obj_name, "triggers");
         for (i = 0; i < cJSON_GetArraySize(triggers); i++) {
             cJSON *trigger = cJSON_GetArrayItem(triggers, i);
-            if(cJSON_GetObjectItem(trigger,"time")->valueint == -1) {
+            if (cJSON_GetObjectItem(trigger,"time")->valueint == -1) {
                 // Check whether all activities that trigger.id depends on are finished
                 if (checkDependedActivities(cJSON_GetObjectItem(trigger, "id")->valuestring)) {
                     createActivity(cJSON_GetObjectItem(trigger, "id")->valuestring);
@@ -650,14 +650,14 @@ void
     onComplete(obj_name);
     pthread_mutex_lock(&count_mutex);
     thread_count--;
-    /*if(thread_count==0){
-    	printf("BECOME 0 in compActivity\n");
-	fflush(stdout);
+    /*if (thread_count==0){
+        printf("BECOME 0 in compActivity\n");
+    fflush(stdout);
     }*/
-    if(thread_count==0){
-	pthread_cond_signal(&count_threshold_cv);
+    if (thread_count==0){
+    pthread_cond_signal(&count_threshold_cv);
      }
-	pthread_mutex_unlock(&count_mutex);
+    pthread_mutex_unlock(&count_mutex);
     return ((void*)0);
 }
 
@@ -669,12 +669,12 @@ void
     createActivity(cJSON_GetObjectItem(trigger, "id")->valuestring);
     pthread_mutex_lock(&count_mutex);
     thread_count--;
-    if(thread_count==0){
-    	printf("BECOME 0 in createActivityAfterTimeout\n");
-	fflush(stdout);
+    if (thread_count==0){
+        printf("BECOME 0 in createActivityAfterTimeout\n");
+    fflush(stdout);
      }
-     if(thread_count==0){
-     	pthread_cond_signal(&count_threshold_cv);
+     if (thread_count==0){
+         pthread_cond_signal(&count_threshold_cv);
       }
      pthread_mutex_unlock(&count_mutex);
     return ((void*)0);
@@ -731,36 +731,36 @@ createActivity(char *job_id)
                 cJSON * this_obj= cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
 
                 if (protocol == HTTP2) {
-		    if(first_download==0){
-                    	pthread_create(&tid2, NULL, request_url, (void *) obj_name);
-                    	pthread_detach(tid2);
-		    }else{
-			pthread_mutex_lock(&count_mutex);
-			thread_count++;
-			pthread_mutex_unlock(&count_mutex);
-                    	pthread_create(&tid2, NULL, request_url, (void *) obj_name);
-                    	pthread_detach(tid2);
-		    }
-                } else if(protocol == HTTP1 || protocol == HTTPS){
-                  	while(1){
-                        	if (global_array_sum() < MAX_CON) {
-					if(first_download==0){
-                            			error = pthread_create(&tid2,NULL,run_worker,(void *)obj_name);
-						pthread_detach(tid2);
-						if(0 != error){
-							fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
-						}
-					}else{
-						pthread_mutex_lock(&count_mutex);
-						thread_count++;
-						pthread_mutex_unlock(&count_mutex);
-						error = pthread_create(&tid2,NULL,run_worker,(void *)obj_name);
-						pthread_detach(tid2);
-						if(0 != error){
-							fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
-						}
-					}
-                            	break;
+            if (first_download==0){
+                        pthread_create(&tid2, NULL, request_url, (void *) obj_name);
+                        pthread_detach(tid2);
+            }else{
+            pthread_mutex_lock(&count_mutex);
+            thread_count++;
+            pthread_mutex_unlock(&count_mutex);
+                        pthread_create(&tid2, NULL, request_url, (void *) obj_name);
+                        pthread_detach(tid2);
+            }
+                } else if (protocol == HTTP1 || protocol == HTTPS){
+                      while(1){
+                            if (global_array_sum() < max_con) {
+                    if (first_download==0){
+                                        error = pthread_create(&tid2,NULL,run_worker,(void *)obj_name);
+                        pthread_detach(tid2);
+                        if (0 != error){
+                            fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
+                        }
+                    }else{
+                        pthread_mutex_lock(&count_mutex);
+                        thread_count++;
+                        pthread_mutex_unlock(&count_mutex);
+                        error = pthread_create(&tid2,NULL,run_worker,(void *)obj_name);
+                        pthread_detach(tid2);
+                        if (0 != error){
+                            fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
+                        }
+                    }
+                                break;
                         }
                     }
 
@@ -769,11 +769,11 @@ createActivity(char *job_id)
             }
         } else {
         // For comp activity
-		pthread_mutex_lock(&count_mutex);
-		thread_count++;
-		pthread_mutex_unlock(&count_mutex);
-            	pthread_create(&tid1, NULL, compActivity, (void *) obj_name);
-            	pthread_detach(tid1);
+        pthread_mutex_lock(&count_mutex);
+        thread_count++;
+        pthread_mutex_unlock(&count_mutex);
+                pthread_create(&tid1, NULL, compActivity, (void *) obj_name);
+                pthread_detach(tid1);
         }
         // TO DO update task start maps
         if (!cJSON_HasObjectItem(map_start, cJSON_GetObjectItem(obj_name, "id")->valuestring)) {
@@ -788,9 +788,9 @@ createActivity(char *job_id)
                 if (cJSON_GetObjectItem(trigger, "time")->valueint != -1) {
                     // Check whether all activities that trigger.id depends on are finished
                     if (checkDependedActivities(cJSON_GetObjectItem(trigger, "id")->valuestring)){
-			pthread_mutex_lock(&count_mutex);
-			thread_count++;
-			pthread_mutex_unlock(&count_mutex);
+            pthread_mutex_lock(&count_mutex);
+            thread_count++;
+            pthread_mutex_unlock(&count_mutex);
                         pthread_create(&tid2, NULL, createActivityAfterTimeout, (void *) trigger);
                         pthread_detach(tid2);
                     }
@@ -804,37 +804,37 @@ createActivity(char *job_id)
 void
 run()
 {
-	struct timeval end;
-	pthread_t thd;
-	int thread_ids=1;
-	map_start=cJSON_CreateObject();
-	map_complete=cJSON_CreateObject();
-	if(protocol==HTTP1){
-		init_worker();
-	}else if(protocol==HTTPS){
-		init_tls_worker();
-	}
-	gettimeofday(&start, NULL);
+    struct timeval end;
+    pthread_t thd;
+    int thread_ids=1;
+    map_start=cJSON_CreateObject();
+    map_complete=cJSON_CreateObject();
+    if (protocol==HTTP1){
+        init_worker();
+    }else if (protocol==HTTPS){
+        init_tls_worker();
+    }
+    gettimeofday(&start, NULL);
 
-	pthread_mutex_init(&count_threshold_mutex, NULL);
-	pthread_mutex_lock(&count_threshold_mutex);
+    pthread_mutex_init(&count_threshold_mutex, NULL);
+    pthread_mutex_lock(&count_threshold_mutex);
 
-	createActivity(cJSON_GetObjectItem(json,"start_activity")->valuestring);
+    createActivity(cJSON_GetObjectItem(json,"start_activity")->valuestring);
 
 
-	/*printf("Start to wait...\n");
-	fflush(stdout);*/
-	pthread_cond_wait(&count_threshold_cv,&count_threshold_mutex);
-	/*printf("After waiting...\n");
-	fflush(stdout);*/
-	printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",
+    /*printf("Start to wait...\n");
+    fflush(stdout);*/
+    pthread_cond_wait(&count_threshold_cv,&count_threshold_mutex);
+    /*printf("After waiting...\n");
+    fflush(stdout);*/
+    printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",
         object_count,
         page_load_time,
         page_size);
 
-	//pthread_create(&thd,NULL,watch_threads, (void *) thread_ids);
-	//sleep(5);
-	//printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",object_count,page_load_time,page_size);
+    //pthread_create(&thd,NULL,watch_threads, (void *) thread_ids);
+    //sleep(5);
+    //printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",object_count,page_load_time,page_size);
 
 
 }
@@ -878,7 +878,7 @@ doit(char *text)
    this_objs_array = cJSON_CreateArray();
    this_acts_array = cJSON_CreateArray();
 
-   for(i = 0; i < cJSON_GetArraySize(objs); i++)
+   for (i = 0; i < cJSON_GetArraySize(objs); i++)
         {
         cJSON * obj = cJSON_GetArrayItem(objs, i);
         /* Handle array of comp */
@@ -1094,9 +1094,9 @@ int main (int argc, char * argv[]) {
     if (argc > 3) {
         if (strcmp(argv[3], "http2") == 0) {
             protocol = HTTP2;
-        } else if(strcmp(argv[3],"http") == 0) {
+        } else if (strcmp(argv[3],"http") == 0) {
             protocol = HTTP1;
-        } else if(strcmp(argv[3],"https") == 0) {
+        } else if (strcmp(argv[3],"https") == 0) {
             protocol = HTTPS;
         } else {
             printf("Not supported protocol.\n");
@@ -1105,23 +1105,23 @@ int main (int argc, char * argv[]) {
     }
 
     /* User defined max parallel conn */
-    if (argc >4){
-	MAX_CON=strtol(argv[4], NULL, 10);
-	if(MAX_CON<1){
-		printf("Invalid number of connections\n");
-		exit(EXIT_FAILURE);
-	}
-	worker_status = malloc (MAX_CON * sizeof (worker_status[0]));
-	for(int i=0;i<MAX_CON;i++){
-                worker_status[i]=0;
+    if (argc > 4){
+        max_con = strtol(argv[4], NULL, 10);
+        if (max_con < 1){
+            printf("Invalid number of connections\n");
+            exit(EXIT_FAILURE);
         }
-    }else{
-	MAX_CON=6;
-	worker_status = malloc (MAX_CON * sizeof (worker_status[0]));
-	for(int i=0;i<MAX_CON;i++){
-                worker_status[i]=0;
-	}
-     }
+        worker_status = malloc(max_con * sizeof(worker_status[0]));
+        for (int i=0; i<max_con; i++){
+            worker_status[i]=0;
+        }
+    } else {
+        max_con = 6;
+        worker_status = malloc(max_con * sizeof(worker_status[0]));
+        for (int i=0;i<max_con;i++){
+            worker_status[i]=0;
+        }
+    }
 
     /* User defined cookie size */
     if (argc > 5) {
