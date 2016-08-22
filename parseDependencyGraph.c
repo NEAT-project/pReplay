@@ -8,6 +8,7 @@ written by-- Mohd Rajiullah*/
 
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include <time.h>
 #include <ctype.h>
@@ -15,14 +16,8 @@ written by-- Mohd Rajiullah*/
 #include <unistd.h>
 #include <curl/curl.h>
 #include <sys/time.h>
+#include <netinet/in.h>
 #include "cJSON.h"
-
-pthread_mutex_t count_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t count_threshold_cv = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t count_threshold_mutex;
-
-int thread_count=0;
-int first_download=0;
 
 #define HTTP1 1
 #define HTTP2 2
@@ -40,16 +35,64 @@ int first_download=0;
 #define CURLPIPE_MULTIPLEX 0
 #endif
 
+#ifdef SCTP_ENABLE
+#define NUM_SCTP_STREAMS    10
+#endif
+
 struct memory_chunk {
     char *memory;
     size_t size;
     int enabled;
 };
 
+#ifdef SCTP_ENABLE
+struct sctp_phttpget {
+    struct addrinfo hints;          /* Hints to getaddrinfo */
+    struct addrinfo *res;           /* Pointer to server address being used */
+    struct addrinfo *res0;          /* Pointer to server addresses */
+#ifdef SCTP_REMOTE_UDP_ENCAPS_PORT
+    struct sctp_udpencaps encaps;   /* SCTP/UDP information */
+#endif
+    char * reqbuf;           /* Request buffer */
+    int reqbufpos;              /* Request buffer position */
+    int reqbuflen;              /* Request buffer length */
+    int nreq;                   /* Number of next request to send */
+    int nres;                   /* Number of next reply to receive */
+    int pipelined;              /* != 0 if connection in pipelined mode. */
+    int sd;                    /* Socket descriptor */
+    int sdflags;                /* Flags on the socket sd */
+    int error;                      /* Error code */
+    int i;                      /* For loop iterator */
+    int firstreq;               /* # of first request for this connection */
+    int val;                        /* Value used for setsockopt call */
+    struct sctp_initmsg initmsg;    /* To signal die number of incoming and outgoing streams */
+    int tempindex;              /* Variable for loops */
+    char *resbuf;            /* Response buffer */
+    int resbuflen;              /* Length of the receiver buffer */
+    int keepalive;              /* Keep-Alive indicator */
+    int fd;                     /* Filedescriptor (file) */
+    struct request *request;        /* Request from open or pending queue */
+    int resbufpos;              /* Response buffer position */
+    int num_req_open;
+    int num_req_pending;
+    struct fd_set fdsetrecv;
+    struct fd_set fdsetsend;
+    int interactive;
+    int maxfd;
+    int selectsock;
+}
+#endif
+
 void createActivity(char *job_id);
 int cJSON_HasArrayItem(cJSON *array, const char *string);
 void onComplete(cJSON *obj_name);
 
+pthread_mutex_t count_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t count_threshold_cv = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t count_threshold_mutex;
+
+int thread_count = 0;
+int first_download = 0;
 int debug = 1;
 double page_load_time = 0.0;
 unsigned long page_size = 0;
@@ -72,12 +115,14 @@ CURL *easy[NUM_HANDLES];
 CURLM *multi_handle = NULL;
 int num_transfers = 0;
 int protocol = HTTP1;
+int transport_protocol = IPPROTO_TCP;
 int request_count = 0;
 int max_con = 0;
 CURL *easyh1[EASY_HANDLES];
 //CURL *easyh1;
 int *worker_status;
 //int worker_status[max_con] = {0, 0, 0, 0, 0, 0};
+
 
 static size_t
 memory_callback(void *contents, size_t size, size_t nmemb, void *userp)
@@ -180,9 +225,9 @@ run_worker(void *arg)
         obj = cJSON_GetArrayItem(this_objs_array, j);
         this_obj= cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
 
-        if (protocol==HTTP1) {
+        if (protocol == HTTP1) {
             snprintf(url, sizeof(url), "%s%s%s", "http://", server, cJSON_GetObjectItem(this_obj, "path")->valuestring);
-        } else if (protocol==HTTPS) {
+        } else if (protocol == HTTPS) {
             snprintf(url, sizeof(url), "%s%s%s", "https://", server, cJSON_GetObjectItem(this_obj, "path")->valuestring);
         }
 
@@ -237,12 +282,12 @@ run_worker(void *arg)
         }
 
 
-    gettimeofday(&te,NULL);
-    pthread_mutex_lock(&lock);
-    page_load_time=end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
-    pthread_mutex_unlock(&lock);
-    total_bytes=(long)bytes+header_bytes;
-    page_size+=(long)bytes;
+        gettimeofday(&te,NULL);
+        pthread_mutex_lock(&lock);
+        page_load_time=end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
+        pthread_mutex_unlock(&lock);
+        total_bytes=(long)bytes+header_bytes;
+        page_size+=(long)bytes;
 
         object_count++;
 
@@ -263,21 +308,22 @@ run_worker(void *arg)
         }
 
         onComplete(obj_name);
-    pthread_mutex_lock(&count_mutex);
-    if (first_download==0){
-        first_download=1;
-    }else{
-        thread_count--;
-    }
-    /*if (thread_count==0){
-        printf("BECOME 0 in run_worker\n");
-        fflush(stdout);
-    }*/
+        pthread_mutex_lock(&count_mutex);
 
-    if (thread_count==0){
-        pthread_cond_signal(&count_threshold_cv);
-    }
-    pthread_mutex_unlock(&count_mutex);
+        if (first_download == 0){
+            first_download = 1;
+        } else {
+            thread_count--;
+        }
+        /*if (thread_count==0){
+            printf("BECOME 0 in run_worker\n");
+            fflush(stdout);
+        }*/
+
+        if (thread_count == 0){
+            pthread_cond_signal(&count_threshold_cv);
+        }
+        pthread_mutex_unlock(&count_mutex);
     }
     return 0;
 }
@@ -324,13 +370,13 @@ request_url(void * arg)
     double end_time;
 
     if (i != -1){
-        cJSON *obj= cJSON_GetArrayItem(this_objs_array, i);
-        cJSON * this_obj= cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
+        cJSON *obj = cJSON_GetArrayItem(this_objs_array, i);
+        cJSON * this_obj = cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
         int still_running = 0; /* keep number of running handles */
         CURL *eh;
         FILE *out;
         char filename[128];
-        int num=0;
+        int num = 0;
         double bytes,avj_obj_size = 0.0;
         long total_bytes = 0;
         long header_bytes = 0;
@@ -338,14 +384,14 @@ request_url(void * arg)
         int res = 0;
 
 
-        snprintf(url, sizeof url,"%s%s%s%s","https://", server, ":8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
+        snprintf(url, sizeof(url), "%s%s%s%s","https://", server, ":8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
         //if (debug==1 && json_output==0)
         //printf("URL: %s\n",url);
         //printf("when_comp_start--: %d\n",cJSON_GetObjectItem(this_obj,"when_comp_start")->valueint);
 
         gettimeofday(&te, NULL);
         end_time = ((te.tv_sec - start.tv_sec) * 1000 + (double)(te.tv_usec - start.tv_usec) / 1000);
-        if (debug==1 && json_output==0) {
+        if (debug == 1 && json_output == 0) {
             printf("[%f] URL: %s\n", end_time, url);
         }
 
@@ -717,8 +763,8 @@ createActivity(char *job_id)
 
         if (debug == 1 && json_output == 0) {
             printf("Object id: %s, type: %s started at %f ms\n",
-                cJSON_GetObjectItem(obj_name,"obj_id")->valuestring,
-                cJSON_GetObjectItem(obj_name,"type")->valuestring,
+                cJSON_GetObjectItem(obj_name, "obj_id")->valuestring,
+                cJSON_GetObjectItem(obj_name, "type")->valuestring,
                 ((ts_s.tv_sec - start.tv_sec) * 1000 + (double)(ts_s.tv_usec - start.tv_usec) / 1000)
             );
         }
@@ -727,57 +773,55 @@ createActivity(char *job_id)
             i = cJSON_HasArrayItem(this_objs_array, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
 
             if (i != -1){
-                obj= cJSON_GetArrayItem(this_objs_array, i);
-                cJSON * this_obj= cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
+                obj = cJSON_GetArrayItem(this_objs_array, i);
+                cJSON * this_obj = cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
 
                 if (protocol == HTTP2) {
-            if (first_download==0){
+                    if (first_download == 0){
                         pthread_create(&tid2, NULL, request_url, (void *) obj_name);
                         pthread_detach(tid2);
-            }else{
-            pthread_mutex_lock(&count_mutex);
-            thread_count++;
-            pthread_mutex_unlock(&count_mutex);
-                        pthread_create(&tid2, NULL, request_url, (void *) obj_name);
-                        pthread_detach(tid2);
-            }
-                } else if (protocol == HTTP1 || protocol == HTTPS){
-                      while(1){
-                            if (global_array_sum() < max_con) {
-                    if (first_download==0){
-                                        error = pthread_create(&tid2,NULL,run_worker,(void *)obj_name);
-                        pthread_detach(tid2);
-                        if (0 != error){
-                            fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
-                        }
-                    }else{
+                    } else {
                         pthread_mutex_lock(&count_mutex);
                         thread_count++;
                         pthread_mutex_unlock(&count_mutex);
-                        error = pthread_create(&tid2,NULL,run_worker,(void *)obj_name);
+                        pthread_create(&tid2, NULL, request_url, (void *) obj_name);
                         pthread_detach(tid2);
-                        if (0 != error){
-                            fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
+                    }
+                } else if (protocol == HTTP1 || protocol == HTTPS){
+                      while(1){
+                        if (global_array_sum() < max_con) {
+                            if (first_download == 0){
+                                error = pthread_create(&tid2, NULL, run_worker, (void *)obj_name);
+                                pthread_detach(tid2);
+                                if (0 != error) {
+                                    fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
+                                }
+                            } else {
+                                pthread_mutex_lock(&count_mutex);
+                                thread_count++;
+                                pthread_mutex_unlock(&count_mutex);
+                                error = pthread_create(&tid2, NULL, run_worker, (void *)obj_name);
+                                pthread_detach(tid2);
+                                if (0 != error) {
+                                    fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
+                                }
+                            }
+                            break;
                         }
                     }
-                                break;
-                        }
-                    }
-
                 }
-
             }
         } else {
-        // For comp activity
-        pthread_mutex_lock(&count_mutex);
-        thread_count++;
-        pthread_mutex_unlock(&count_mutex);
-                pthread_create(&tid1, NULL, compActivity, (void *) obj_name);
-                pthread_detach(tid1);
+            // For comp activity
+            pthread_mutex_lock(&count_mutex);
+            thread_count++;
+            pthread_mutex_unlock(&count_mutex);
+            pthread_create(&tid1, NULL, compActivity, (void *) obj_name);
+            pthread_detach(tid1);
         }
         // TO DO update task start maps
         if (!cJSON_HasObjectItem(map_start, cJSON_GetObjectItem(obj_name, "id")->valuestring)) {
-            cJSON_AddNumberToObject(map_start, cJSON_GetObjectItem(obj_name, "id")->valuestring,1);
+            cJSON_AddNumberToObject(map_start, cJSON_GetObjectItem(obj_name, "id")->valuestring, 1);
         }
 
         // Check whether should trigger dependent activities when 'time' != -1
@@ -788,9 +832,9 @@ createActivity(char *job_id)
                 if (cJSON_GetObjectItem(trigger, "time")->valueint != -1) {
                     // Check whether all activities that trigger.id depends on are finished
                     if (checkDependedActivities(cJSON_GetObjectItem(trigger, "id")->valuestring)){
-            pthread_mutex_lock(&count_mutex);
-            thread_count++;
-            pthread_mutex_unlock(&count_mutex);
+                        pthread_mutex_lock(&count_mutex);
+                        thread_count++;
+                        pthread_mutex_unlock(&count_mutex);
                         pthread_create(&tid2, NULL, createActivityAfterTimeout, (void *) trigger);
                         pthread_detach(tid2);
                     }
@@ -1082,8 +1126,8 @@ int main (int argc, char * argv[]) {
     char ch;
 
 
-    if (argc < 3 || argc > 6){
-        fprintf(stderr,"usage: %s server testfile [http|https|http2] [max-connections][cookie-size]\n", argv[0]);
+    if (argc < 3 || argc > 7){
+        fprintf(stderr,"usage: %s server testfile [http|https|http2] [max-connections] [cookie-size] [sctp|tcp]\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
@@ -1092,11 +1136,11 @@ int main (int argc, char * argv[]) {
 
     /* User defined a protocol via arguments - HTTP1 is default */
     if (argc > 3) {
-        if (strcmp(argv[3], "http2") == 0) {
+        if (strcasecmp(argv[3], "http2") == 0) {
             protocol = HTTP2;
-        } else if (strcmp(argv[3],"http") == 0) {
+        } else if (strcasecmp(argv[3],"http") == 0) {
             protocol = HTTP1;
-        } else if (strcmp(argv[3],"https") == 0) {
+        } else if (strcasecmp(argv[3],"https") == 0) {
             protocol = HTTPS;
         } else {
             printf("Not supported protocol.\n");
@@ -1126,6 +1170,20 @@ int main (int argc, char * argv[]) {
     /* User defined cookie size */
     if (argc > 5) {
         cookie_size = strtol(argv[5], NULL, 10);
+    }
+
+    /* User defined protocol */
+    if (argc > 6) {
+        if (strcasecmp(argv[6], "tcp") == 0) {
+            transport_protocol = IPPROTO_TCP;
+#ifdef SCTP_ENABLE
+        } else if (strcasecmp(argv[6], "sctp") == 0) {
+            transport_protocol = IPPROTO_SCTP;
+#endif
+        } else {
+            fprintf(stderr, "Unsupported transport protocol: %s\n", argv[6]);
+            exit(EXIT_FAILURE);
+        }
     }
 
     /* Prepare cookie */
