@@ -473,6 +473,9 @@ phttpget_request_url(void *arg) {
         pthread_mutex_unlock(&(request->recv_mutex));
         printf("#### AFTER MUTEX!!!!\n");
 
+        pthread_mutex_destroy(&(request->recv_mutex));
+        pthread_cond_destroy(&(request->recv_cv));
+
 
         printf("####### PHTTPGET\n");
         printf("payload : %d\n", request->pipe_data.size_payload);
