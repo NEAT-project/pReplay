@@ -500,6 +500,9 @@ phttpget_request_url(void *arg) {
             printf("[%f] Object_size: %ld, transfer_time: %f\n", end_time, (long)bytes+header_bytes, transfer_time);
         }
 
+        TAILQ_REMOVE(&phttpget_requests_pending, request, entries);
+        free(request);
+
         onComplete(obj_name);
         pthread_mutex_lock(&count_mutex);
 
