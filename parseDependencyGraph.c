@@ -56,15 +56,14 @@ struct memory_chunk {
 };
 
 struct sctp_pipe_data {
+    uint32_t    request_id;
     uint32_t    pathlen;
     uint32_t    size_header;
     uint32_t    size_payload;
-    pthread_t   tid;
     char        path[FIFO_BUFFER_SIZE];
 };
 
 struct phttpget_request {
-    pthread_t tid;
     pthread_mutex_t recv_mutex;
     pthread_cond_t recv_cv;
     uint8_t got_response;
@@ -113,6 +112,10 @@ char *fifo_in_name = "/tmp/phttpget-out";
 char *fifo_out_name = "/tmp/phttpget-in";
 
 pthread_t phttpget_recv_thread;
+
+uint32_t phttpget_request_counter = 0;
+
+pthread_mutex_t phttpget_write_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 TAILQ_HEAD(phttpget_request_queue, phttpget_request);
 struct phttpget_request_queue phttpget_requests_pending;
@@ -383,7 +386,7 @@ phttpget_recv_handler()
         /* search for thread */
         found = 0;
         TAILQ_FOREACH(request, &phttpget_requests_pending, entries) {
-            if (request->tid == pipe_data_temp.tid) {
+            if (request->pipe_data.request_id == pipe_data_temp.request_id) {
                 found = 1;
                 break;
             }
@@ -391,7 +394,7 @@ phttpget_recv_handler()
 
         /* thread not found - this should not happen ... */
         if (!found) {
-            fprintf(stderr, "[%d][%s] - request not found - fix logic!!\n", __LINE__, __func__);
+            fprintf(stderr, "[%d][%s] - request %s not found - read_len : %d - fix logic!!\n", __LINE__, __func__, pipe_data_temp.path, read_len);
             exit(EXIT_FAILURE);
         }
 
@@ -457,7 +460,6 @@ phttpget_request_url(void *arg) {
         memset(request, 0, sizeof(struct phttpget_request));
 
         /* initialize mutex */
-        request->tid = pthread_self();
         pthread_mutex_init(&(request->recv_mutex), NULL);
         pthread_cond_init(&(request->recv_cv), NULL);
         request->got_response = 0;
@@ -468,8 +470,10 @@ phttpget_request_url(void *arg) {
             cJSON_GetObjectItem(this_obj,
             "path")->valuestring
         );
-        request->pipe_data.tid = pthread_self();
 
+
+        pthread_mutex_lock(&phttpget_write_mutex);
+        request->pipe_data.request_id = phttpget_request_counter++;
         /* add request to queue */
         TAILQ_INSERT_TAIL(&phttpget_requests_pending, request, entries);
 
@@ -480,6 +484,9 @@ phttpget_request_url(void *arg) {
                 exit(EXIT_FAILURE);
             }
         }
+        pthread_mutex_unlock(&phttpget_write_mutex);
+
+        fprintf(stderr, "[%d][%s] - requesting %d : %s\n", __LINE__, __func__, request->pipe_data.request_id, request->pipe_data.path);
 
         /* wait for receiver thread */
         pthread_mutex_lock(&(request->recv_mutex));
@@ -1070,11 +1077,11 @@ run()
     createActivity(cJSON_GetObjectItem(json,"start_activity")->valuestring);
 
 
-    /*printf("Start to wait...\n");
-    fflush(stdout);*/
+    printf("################ Start to wait...\n");
+    fflush(stdout);
     pthread_cond_wait(&count_threshold_cv,&count_threshold_mutex);
-    /*printf("After waiting...\n");
-    fflush(stdout);*/
+    printf("################ After waiting...\n");
+    fflush(stdout);
     printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",
         object_count,
         page_load_time,
