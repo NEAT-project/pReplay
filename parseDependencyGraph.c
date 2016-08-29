@@ -4,7 +4,7 @@ trees based page load process
 in todays browser
 
 written by-- Mohd Rajiullah*/
-//#define _XOPEN_SOURCE 700
+#define _XOPEN_SOURCE 700
 
 #include <stdio.h>
 #include <string.h>
@@ -391,7 +391,7 @@ phttpget_recv_handler()
 
         /* thread not found - this should not happen ... */
         if (!found) {
-            fprintf(stderr, "[%d][%s] - request not found - fix logic!!\n", __LINE__, __func__, errno, strerror(errno));
+            fprintf(stderr, "[%d][%s] - request not found - fix logic!!\n", __LINE__, __func__);
             exit(EXIT_FAILURE);
         }
 
