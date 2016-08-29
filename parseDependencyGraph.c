@@ -4,7 +4,7 @@ trees based page load process
 in todays browser
 
 written by-- Mohd Rajiullah*/
-//#define _XOPEN_SOURCE 700
+#define _XOPEN_SOURCE 700
 
 #include <stdio.h>
 #include <string.h>
