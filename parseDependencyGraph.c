@@ -24,12 +24,9 @@ written by-- Mohd Rajiullah*/
 #include <errno.h>
 #include <sys/queue.h>
 
-pthread_mutex_t count_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t count_threshold_cv = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t count_threshold_mutex;
-
-int thread_count=0;
-int first_download=0;
+pthread_mutex_t thread_count_mutex  = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t thread_count_cv      = PTHREAD_COND_INITIALIZER;
+int thread_count                    = 0;
 
 #define HTTP1 1
 #define HTTP2 2
@@ -110,13 +107,9 @@ int fifo_in_fd = -1;
 int fifo_out_fd = -1;
 char *fifo_in_name = "/tmp/phttpget-out";
 char *fifo_out_name = "/tmp/phttpget-in";
-
 pthread_t phttpget_recv_thread;
-
 uint32_t phttpget_request_counter = 0;
-
 pthread_mutex_t phttpget_write_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 TAILQ_HEAD(phttpget_request_queue, phttpget_request);
 struct phttpget_request_queue phttpget_requests_pending;
 /* PHTTPGET STUFF END */
@@ -157,6 +150,7 @@ init_worker()
 
         if ((res = curl_easy_setopt(easyh1[i], CURLOPT_TCP_NODELAY, 1L)) != CURLE_OK) {
             fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+            exit(EXIT_FAILURE);
         }
 
         /* some servers don't like requests that are made without a user-agent
@@ -164,6 +158,7 @@ init_worker()
          */
         if ((res = curl_easy_setopt(easyh1[i], CURLOPT_USERAGENT, "pReplay/0.1")) != CURLE_OK) {
             fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+            exit(EXIT_FAILURE);
         }
     }
     return 0;
@@ -184,15 +179,16 @@ init_tls_worker()
         if ((res = curl_easy_setopt(easyh1[i], CURLOPT_TCP_NODELAY, 1L)) != CURLE_OK ||
             (res = curl_easy_setopt(easyh1[i], CURLOPT_HEADER, 0L)) != CURLE_OK ||
             (res = curl_easy_setopt(easyh1[i], CURLOPT_SSL_VERIFYPEER, 0L)) != CURLE_OK ||
-            (res = curl_easy_setopt(easyh1[i], CURLOPT_SSL_VERIFYHOST, 0L)) != CURLE_OK)
-            {
+            (res = curl_easy_setopt(easyh1[i], CURLOPT_SSL_VERIFYHOST, 0L)) != CURLE_OK) {
             fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+            exit(EXIT_FAILURE);
             }
 
             /* some servers don't like requests that are made without a user-agent
              * field, so we provide one */
         if ((res = curl_easy_setopt(easyh1[i], CURLOPT_USERAGENT, "pReplay/0.1")) != CURLE_OK) {
             fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+            exit(EXIT_FAILURE);
         }
     }
     return 0;
@@ -229,7 +225,8 @@ run_worker(void *arg)
         }
 
         pthread_mutex_lock(&lock);
-        while(1) {
+        while (1) {
+            fprintf(stderr, "searching\n");
             for (i = 0; i < max_con; i++) {
                 if (worker_status[i] == 0){
                     idle_worker_found = 1;
@@ -245,10 +242,12 @@ run_worker(void *arg)
 
         if ((res = curl_easy_setopt(easyh1[i], CURLOPT_WRITEFUNCTION, memory_callback)) != CURLE_OK) {
             fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+            exit(EXIT_FAILURE);
         }
 
         if ((res = curl_easy_setopt(easyh1[i], CURLOPT_WRITEDATA, (void *)&chunk)) != CURLE_OK) {
             fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+            exit(EXIT_FAILURE);
         }
 
 
@@ -267,24 +266,28 @@ run_worker(void *arg)
         if ((res=curl_easy_perform(easyh1[i])) != CURLE_OK){
             //fprintf(stderr, "i= %d\n", i);
             perror("Curl error");
+            exit(EXIT_FAILURE);
         }
 
-        worker_status[i]=0;
+
 
         if ((res = curl_easy_getinfo(easyh1[i], CURLINFO_SIZE_DOWNLOAD, &bytes)) != CURLE_OK ||
             (res = curl_easy_getinfo(easyh1[i], CURLINFO_HEADER_SIZE, &header_bytes)) != CURLE_OK ||
             (res = curl_easy_getinfo(easyh1[i], CURLINFO_TOTAL_TIME, &transfer_time)) != CURLE_OK )
             {
             fprintf(stderr, "cURL error: %s\n", curl_easy_strerror(res));
+            exit(EXIT_FAILURE);
         }
 
+        worker_status[i] = 0;
 
-    gettimeofday(&te,NULL);
-    pthread_mutex_lock(&lock);
-    page_load_time=end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
-    pthread_mutex_unlock(&lock);
-    total_bytes=(long)bytes+header_bytes;
-    page_size+=(long)bytes;
+
+        gettimeofday(&te,NULL);
+        pthread_mutex_lock(&lock);
+        page_load_time=end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
+        pthread_mutex_unlock(&lock);
+        total_bytes=(long)bytes+header_bytes;
+        page_size+=(long)bytes;
 
         object_count++;
 
@@ -305,21 +308,20 @@ run_worker(void *arg)
         }
 
         onComplete(obj_name);
-    pthread_mutex_lock(&count_mutex);
-    if (first_download==0){
-        first_download=1;
-    }else{
-        thread_count--;
-    }
-    /*if (thread_count==0){
-        printf("BECOME 0 in run_worker\n");
-        fflush(stdout);
-    }*/
 
-    if (thread_count==0){
-        pthread_cond_signal(&count_threshold_cv);
-    }
-    pthread_mutex_unlock(&count_mutex);
+        pthread_mutex_lock(&thread_count_mutex);
+        thread_count--;
+        /*if (thread_count==0){
+            printf("BECOME 0 in run_worker\n");
+            fflush(stdout);
+        }*/
+
+        pthread_cond_signal(&thread_count_cv);
+        pthread_mutex_unlock(&thread_count_mutex);
+
+
+
+
     }
     return 0;
 }
@@ -531,22 +533,20 @@ phttpget_request_url(void *arg) {
         }
 
         onComplete(obj_name);
-        pthread_mutex_lock(&count_mutex);
 
-        if (first_download == 0) {
-            first_download = 1;
-        } else {
-            thread_count--;
-        }
+        pthread_mutex_lock(&thread_count_mutex);
+
+        thread_count--;
         /*if (thread_count==0){
             printf("BECOME 0 in request_url\n");
                 fflush(stdout);
         }*/
 
-        if (thread_count == 0){
-            pthread_cond_signal(&count_threshold_cv);
-        }
-        pthread_mutex_unlock(&count_mutex);
+        pthread_cond_signal(&thread_count_cv);
+        pthread_mutex_unlock(&thread_count_mutex);
+
+
+
     } else {
         if (debug && !json_output) {
             fprintf(stderr, "[%d][%s] - object not found - fix file!!!...\n", __LINE__, __func__);
@@ -742,22 +742,16 @@ request_url(void *arg)
         }
 
         onComplete(obj_name);
-        pthread_mutex_lock(&count_mutex);
+        pthread_mutex_lock(&thread_count_mutex);
 
-        if (first_download == 0) {
-            first_download = 1;
-        } else {
-            thread_count--;
-        }
+        thread_count--;
         /*if (thread_count==0){
             printf("BECOME 0 in request_url\n");
                 fflush(stdout);
         }*/
 
-        if (thread_count == 0){
-            pthread_cond_signal(&count_threshold_cv);
-        }
-        pthread_mutex_unlock(&count_mutex);
+        pthread_cond_signal(&thread_count_cv);
+        pthread_mutex_unlock(&thread_count_mutex);
     }
     return 0;
 }
@@ -892,16 +886,15 @@ void
     //printf("Time out value: %d, object name: %s\n",cJSON_GetObjectItem(obj_name,"time")->valueint, cJSON_GetObjectItem(obj_name,"obj_id")->valuestring);
     setTimeout(cJSON_GetObjectItem(obj_name, "time")->valueint, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
     onComplete(obj_name);
-    pthread_mutex_lock(&count_mutex);
+    pthread_mutex_lock(&thread_count_mutex);
     thread_count--;
     /*if (thread_count==0){
         printf("BECOME 0 in compActivity\n");
     fflush(stdout);
     }*/
-    if (thread_count==0){
-    pthread_cond_signal(&count_threshold_cv);
-     }
-    pthread_mutex_unlock(&count_mutex);
+
+    pthread_cond_signal(&thread_count_cv);
+    pthread_mutex_unlock(&thread_count_mutex);
     return ((void*)0);
 }
 
@@ -911,16 +904,15 @@ void
     cJSON *trigger = arg;
     setTimeout(cJSON_GetObjectItem(trigger, "time")->valueint, cJSON_GetObjectItem(trigger, "id")->valuestring);
     createActivity(cJSON_GetObjectItem(trigger, "id")->valuestring);
-    pthread_mutex_lock(&count_mutex);
+    pthread_mutex_lock(&thread_count_mutex);
     thread_count--;
     if (thread_count==0){
         printf("BECOME 0 in createActivityAfterTimeout\n");
-    fflush(stdout);
-     }
-     if (thread_count==0){
-         pthread_cond_signal(&count_threshold_cv);
-      }
-     pthread_mutex_unlock(&count_mutex);
+        fflush(stdout);
+    }
+
+    pthread_cond_signal(&thread_count_cv);
+    pthread_mutex_unlock(&thread_count_mutex);
     return ((void*)0);
 }
 
@@ -938,7 +930,7 @@ createActivity(char *job_id)
 
     int i = cJSON_HasArrayItem(this_acts_array, job_id);
 
-    if (i != -1){
+    if (i != -1) {
         obj = cJSON_GetArrayItem(this_acts_array, i);
         obj_name = cJSON_GetObjectItem(obj, job_id);
 
@@ -976,58 +968,59 @@ createActivity(char *job_id)
                 cJSON * this_obj= cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
 
                 if (protocol == HTTP2) {
-                    if (first_download == 0) {
-                        pthread_create(&tid2, NULL, request_url, (void *) obj_name);
-                        pthread_detach(tid2);
-                    } else {
-                        pthread_mutex_lock(&count_mutex);
-                        thread_count++;
-                        pthread_mutex_unlock(&count_mutex);
-                        pthread_create(&tid2, NULL, request_url, (void *) obj_name);
-                        pthread_detach(tid2);
+                    pthread_mutex_lock(&thread_count_mutex);
+                    thread_count++;
+                    pthread_cond_signal(&thread_count_cv);
+                    pthread_mutex_unlock(&thread_count_mutex);
+                    error = pthread_create(&tid2, NULL, request_url, (void *) obj_name);
+                    if (error) {
+                        fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
+                        exit(EXIT_FAILURE);
                     }
+                    pthread_detach(tid2);
+
                 } else if (protocol == HTTP1 || protocol == HTTPS) {
-                    while(1){
+                    while (1) {
                         if (global_array_sum() < max_con) {
-                            if (first_download == 0) {
-                                error = pthread_create(&tid2, NULL, run_worker, (void *)obj_name);
-                                pthread_detach(tid2);
-                                if (0 != error) {
-                                    fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
-                                }
-                            } else {
-                                pthread_mutex_lock(&count_mutex);
-                                thread_count++;
-                                pthread_mutex_unlock(&count_mutex);
-                                error = pthread_create(&tid2,NULL,run_worker,(void *)obj_name);
-                                pthread_detach(tid2);
-                                if (0 != error) {
-                                    fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
-                                }
+                            pthread_mutex_lock(&thread_count_mutex);
+                            thread_count++;
+                            pthread_cond_signal(&thread_count_cv);
+                            pthread_mutex_unlock(&thread_count_mutex);
+                            error = pthread_create(&tid2,NULL,run_worker,(void *)obj_name);
+                            if (error) {
+                                fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
+                                exit(EXIT_FAILURE);
                             }
+                            pthread_detach(tid2);
                             break;
                         }
                     }
                 } else if (protocol == PHTTPGET) {
                     fprintf(stderr, "starting thread...\n");
-                    if (first_download == 0) {
-                        pthread_create(&tid2, NULL, phttpget_request_url, (void *) obj_name);
-                        pthread_detach(tid2);
-                    } else {
-                        pthread_mutex_lock(&count_mutex);
-                        thread_count++;
-                        pthread_mutex_unlock(&count_mutex);
-                        pthread_create(&tid2, NULL, phttpget_request_url, (void *) obj_name);
-                        pthread_detach(tid2);
+
+                    pthread_mutex_lock(&thread_count_mutex);
+                    thread_count++;
+                    pthread_cond_signal(&thread_count_cv);
+                    pthread_mutex_unlock(&thread_count_mutex);
+                    error = pthread_create(&tid2, NULL, phttpget_request_url, (void *) obj_name);
+                    if (error) {
+                        fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
+                        exit(EXIT_FAILURE);
                     }
+                    pthread_detach(tid2);
                 }
             }
         } else {
             // For comp activity
-            pthread_mutex_lock(&count_mutex);
+            pthread_mutex_lock(&thread_count_mutex);
             thread_count++;
-            pthread_mutex_unlock(&count_mutex);
-            pthread_create(&tid1, NULL, compActivity, (void *) obj_name);
+            pthread_cond_signal(&thread_count_cv);
+            pthread_mutex_unlock(&thread_count_mutex);
+            error = pthread_create(&tid1, NULL, compActivity, (void *) obj_name);
+            if (error) {
+                fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
+                exit(EXIT_FAILURE);
+            }
             pthread_detach(tid1);
         }
         // TO DO update task start maps
@@ -1043,10 +1036,15 @@ createActivity(char *job_id)
                 if (cJSON_GetObjectItem(trigger, "time")->valueint != -1) {
                     // Check whether all activities that trigger.id depends on are finished
                     if (checkDependedActivities(cJSON_GetObjectItem(trigger, "id")->valuestring)){
-                        pthread_mutex_lock(&count_mutex);
+                        pthread_mutex_lock(&thread_count_mutex);
                         thread_count++;
-                        pthread_mutex_unlock(&count_mutex);
-                        pthread_create(&tid2, NULL, createActivityAfterTimeout, (void *) trigger);
+                        pthread_cond_signal(&thread_count_cv);
+                        pthread_mutex_unlock(&thread_count_mutex);
+                        error = pthread_create(&tid2, NULL, createActivityAfterTimeout, (void *) trigger);
+                        if (error) {
+                            fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
+                            exit(EXIT_FAILURE);
+                        }
                         pthread_detach(tid2);
                     }
                 }
@@ -1061,27 +1059,29 @@ run()
 {
     struct timeval end;
     pthread_t thd;
-    int thread_ids=1;
-    map_start=cJSON_CreateObject();
-    map_complete=cJSON_CreateObject();
-    if (protocol==HTTP1){
+    int thread_ids = 1;
+    map_start = cJSON_CreateObject();
+    map_complete = cJSON_CreateObject();
+
+
+    if (protocol == HTTP1){
         init_worker();
-    }else if (protocol==HTTPS){
+    } else if (protocol == HTTPS){
         init_tls_worker();
     }
     gettimeofday(&start, NULL);
 
-    pthread_mutex_init(&count_threshold_mutex, NULL);
-    pthread_mutex_lock(&count_threshold_mutex);
-
     createActivity(cJSON_GetObjectItem(json,"start_activity")->valuestring);
 
+    pthread_mutex_lock(&thread_count_mutex);
+    while (thread_count > 0) {
+        fprintf(stderr, "checking thread - active : %d\n", thread_count);
+        pthread_cond_wait(&thread_count_cv, &thread_count_mutex);
+    }
+    pthread_mutex_unlock(&thread_count_mutex);
 
-    printf("################ Start to wait...\n");
-    fflush(stdout);
-    pthread_cond_wait(&count_threshold_cv,&count_threshold_mutex);
-    printf("################ After waiting...\n");
-    fflush(stdout);
+    printf("############# run - finished!\n");
+
     printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",
         object_count,
         page_load_time,
@@ -1317,7 +1317,7 @@ dofile(char *filename)
     f = fopen(filename,"rb");
     if (f == NULL) {
         perror("Error opening file\n");
-        exit(0);
+        exit(EXIT_FAILURE);
     }
 
     fseek(f, 0, SEEK_END);
@@ -1367,7 +1367,7 @@ int main (int argc, char * argv[]) {
             pthread_create(&phttpget_recv_thread, NULL, phttpget_recv_handler, NULL);
             pthread_detach(phttpget_recv_thread);
         } else {
-            printf("Protocol not supported\n");
+            fprintf(stderr, "Protocol not supported\n");
             exit(EXIT_FAILURE);
         }
     }
@@ -1376,7 +1376,7 @@ int main (int argc, char * argv[]) {
     if (argc > 4){
         max_con = strtol(argv[4], NULL, 10);
         if (max_con < 1){
-            printf("Invalid number of connections\n");
+            fprintf(stderr, "Invalid number of connections\n");
             exit(EXIT_FAILURE);
         }
         worker_status = malloc(max_con * sizeof(worker_status[0]));
@@ -1423,7 +1423,7 @@ int main (int argc, char * argv[]) {
     dofile(testfile);
     pthread_mutex_destroy(&lock);
 
-    sleep(2);
+    //sleep(2);
 
     //cJSON_Delete(json);
     return 0;
