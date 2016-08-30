@@ -587,7 +587,7 @@ request_url(void *arg)
         FILE *out;
         char filename[128];
         int num=0;
-        double bytes,avj_obj_size = 0.0;
+        double bytes = 0.0;
         long total_bytes = 0;
         long header_bytes = 0;
         double transfer_time = 0.0;
@@ -941,7 +941,6 @@ void
 createActivity(char *job_id)
 {
     pthread_t tid1, tid2;
-    char url[400];
     int error;
     struct timeval ts_s;
     cJSON * obj;
@@ -994,8 +993,6 @@ createActivity(char *job_id)
 
             if (i != -1) {
                 obj= cJSON_GetArrayItem(this_objs_array, i);
-                cJSON * this_obj= cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
-
                 if (protocol == HTTP2) {
                     pthread_mutex_lock(&thread_count_mutex);
                     thread_count++;
@@ -1025,8 +1022,6 @@ createActivity(char *job_id)
                         }
                     }
                 } else if (protocol == PHTTPGET) {
-                    fprintf(stderr, "starting thread...\n");
-
                     pthread_mutex_lock(&thread_count_mutex);
                     thread_count++;
                     pthread_cond_signal(&thread_count_cv);
@@ -1086,9 +1081,6 @@ createActivity(char *job_id)
 void
 run()
 {
-    struct timeval end;
-    pthread_t thd;
-    int thread_ids = 1;
     map_start = cJSON_CreateObject();
     map_complete = cJSON_CreateObject();
 
@@ -1116,20 +1108,14 @@ run()
         page_load_time,
         page_size);
 
-    //pthread_create(&thd,NULL,watch_threads, (void *) thread_ids);
-    //sleep(5);
-    //printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",object_count,page_load_time,page_size);
-
-
 }
 
 void
 doit(char *text)
 {
-   cJSON *temp_obj;
    json = cJSON_Parse(text);
    int i,j;
-   char *out, *a1, *a2;
+   char *out, *a1;
    char dep_id[16];
    int deps_length;
    cJSON *comp;
@@ -1361,10 +1347,6 @@ dofile(char *filename)
 
 
 int main (int argc, char * argv[]) {
-    int i;
-    char ch;
-
-
     if (argc < 3 || argc > 6){
         fprintf(stderr,"usage: %s server testfile [http|https|http2|phttpget] [max-connections] [cookie-size]\n", argv[0]);
         exit(EXIT_FAILURE);
