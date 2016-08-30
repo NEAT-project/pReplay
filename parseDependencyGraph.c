@@ -58,7 +58,7 @@ struct sctp_pipe_data {
     uint32_t    size_header;
     uint32_t    size_payload;
     char        path[FIFO_BUFFER_SIZE];
-};
+} __attribute__ ((packed));
 
 struct phttpget_request {
     pthread_mutex_t recv_mutex;
@@ -285,12 +285,11 @@ run_worker(void *arg)
         gettimeofday(&te,NULL);
         pthread_mutex_lock(&lock);
         page_load_time=end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
-        pthread_mutex_unlock(&lock);
+
         total_bytes=(long)bytes+header_bytes;
         page_size+=(long)bytes;
 
         object_count++;
-
         if (json_output == 1) {
             if (first_object == 0) {
                 printf("{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
@@ -299,6 +298,7 @@ run_worker(void *arg)
                 printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
             }
         }
+        pthread_mutex_unlock(&lock);
 
         if (debug == 1) {
             fprintf(stderr, "[%f] Object_size: %ld, transfer_time: %f\n",
@@ -369,6 +369,7 @@ phttpget_recv_handler()
     struct phttpget_request *request = NULL;
     struct sctp_pipe_data pipe_data_temp;
     uint8_t found = 0;
+    uint32_t response_counter = 0;
 
     if (debug && !json_output) {
         fprintf(stderr, "[%d][%s] - receiver thread started...\n", __LINE__, __func__);
@@ -396,16 +397,17 @@ phttpget_recv_handler()
 
         /* thread not found - this should not happen ... */
         if (!found) {
-            fprintf(stderr, "[%d][%s] - request %s not found - read_len : %d - fix logic!!\n", __LINE__, __func__, pipe_data_temp.path, read_len);
+            fprintf(stderr, "[%d][%s] - request %d (%s) not found - read_len : %d - fix logic!!\n", __LINE__, __func__, pipe_data_temp.request_id, pipe_data_temp.path, read_len);
             exit(EXIT_FAILURE);
         }
 
         /* copy pipe_data */
         /* felix : ugly - todo! ... */
         memcpy(&(request->pipe_data), &pipe_data_temp, sizeof(struct sctp_pipe_data));
+        response_counter++;
 
         if (debug && !json_output) {
-            fprintf(stderr, "handling response for %s\n", request->pipe_data.path);
+            fprintf(stderr, "handling response %d - %s\n", response_counter, request->pipe_data.path);
         }
 
         /* notify waiting thread */
@@ -482,7 +484,7 @@ phttpget_request_url(void *arg) {
         /* write request to pipe */
         if (request->pipe_data.pathlen > 0) {
             if (write(fifo_out_fd, &(request->pipe_data), sizeof(struct sctp_pipe_data)) != sizeof(struct sctp_pipe_data)) {
-                fprintf(stderr, "[%d][%s] - malloc failed\n", __LINE__, __func__);
+                fprintf(stderr, "[%d][%s] - write failed\n", __LINE__, __func__);
                 exit(EXIT_FAILURE);
             }
         }
@@ -502,6 +504,7 @@ phttpget_request_url(void *arg) {
 
         if (debug && !json_output) {
             printf("####### PHTTPGET\n");
+            printf("id      : %d\n", request->pipe_data.request_id);
             printf("payload : %d\n", request->pipe_data.size_payload);
             printf("header  : %d\n", request->pipe_data.size_header);
         }
@@ -509,7 +512,6 @@ phttpget_request_url(void *arg) {
         gettimeofday(&te, NULL);
         pthread_mutex_lock(&lock);
         page_load_time = end_time= ((te.tv_sec - start.tv_sec) * 1000 + (double)(te.tv_usec - start.tv_usec) / 1000);
-        pthread_mutex_unlock(&lock);
 
         total_bytes = request->pipe_data.size_payload + request->pipe_data.size_header;
         page_size += request->pipe_data.size_payload;
@@ -519,6 +521,7 @@ phttpget_request_url(void *arg) {
         free(request);
 
         object_count++;
+        pthread_mutex_unlock(&lock);
 
         if (json_output == 1) {
             if (first_object==0){
@@ -528,7 +531,8 @@ phttpget_request_url(void *arg) {
                 printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
             }
         }
-        if (debug==1 && json_output==0) {
+
+        if (debug && !json_output) {
             printf("[%f] Object_size: %ld, transfer_time: %f\n", end_time, (long)bytes+header_bytes, transfer_time);
         }
 
@@ -723,11 +727,11 @@ request_url(void *arg)
         gettimeofday(&te, NULL);
         pthread_mutex_lock(&lock);
         page_load_time = end_time= ((te.tv_sec - start.tv_sec) * 1000 + (double)(te.tv_usec - start.tv_usec) / 1000);
-        pthread_mutex_unlock(&lock);
         total_bytes = (long)bytes + header_bytes;
         page_size += (long)bytes;
 
         object_count++;
+        pthread_mutex_unlock(&lock);
 
         if (json_output == 1) {
             if (first_object==0){
@@ -819,7 +823,7 @@ onComplete(cJSON *obj_name)
     pthread_mutex_unlock(&lock);
     cJSON_AddNumberToObject(obj_name, "ts_e", end_time);
 
-    if (debug == 1) {
+    if (debug) {
         printf("=== [onComplete][%f] {\"id\":%s,\"type\":%s,\"is_started\":%d,\"ts_s\":%f,\"ts_e\":%f}\n",
             end_time,
             cJSON_GetObjectItem(obj_name,"id")->valuestring,
@@ -829,10 +833,15 @@ onComplete(cJSON *obj_name)
             cJSON_GetObjectItem(obj_name,"ts_e")->valuedouble);
     }
 
+    pthread_mutex_lock(&lock);
     // TO DO update task completion maps
     if (!cJSON_HasObjectItem(map_complete, cJSON_GetObjectItem(obj_name, "id")->valuestring)) {
         cJSON_AddNumberToObject(map_complete, cJSON_GetObjectItem(obj_name, "id")->valuestring, 1);
+    } else {
+        fprintf(stderr, "dublicate object - fix logic!\n");
+        exit(EXIT_FAILURE);
     }
+    pthread_mutex_unlock(&lock);
 
     // Check whether should trigger dependent activities when 'time' == -1
     if (cJSON_HasObjectItem(obj_name, "triggers")) {
@@ -926,6 +935,7 @@ createActivity(char *job_id)
     struct timeval ts_s;
     cJSON * obj;
     cJSON * obj_name;
+    uint8_t duplicate_job = 0;
 
 
     int i = cJSON_HasArrayItem(this_acts_array, job_id);
@@ -934,14 +944,22 @@ createActivity(char *job_id)
         obj = cJSON_GetArrayItem(this_acts_array, i);
         obj_name = cJSON_GetObjectItem(obj, job_id);
 
+        pthread_mutex_lock(&lock);
         if (cJSON_HasObjectItem(obj_name, "is_started")){
             if (cJSON_GetObjectItem(obj_name, "is_started")->valueint == 1) {
-                return;
+                fprintf(stderr, "%s : activity already started ... fix logic?\n", cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
+                //exit(EXIT_FAILURE);
+                duplicate_job = 1;
             } else {
                 cJSON_GetObjectItem(obj_name,"is_started")->valueint = 1;
             }
         } else {
             cJSON_AddNumberToObject(obj_name,"is_started",1);
+        }
+        pthread_mutex_unlock(&lock);
+
+        if (duplicate_job) {
+            return;
         }
 
 
