@@ -53,7 +53,7 @@ struct memory_chunk {
 };
 
 struct sctp_pipe_data {
-    uint32_t    request_id;
+    uint32_t    id;
     uint32_t    pathlen;
     uint32_t    size_header;
     uint32_t    size_payload;
@@ -109,6 +109,7 @@ char *fifo_in_name = "/tmp/phttpget-out";
 char *fifo_out_name = "/tmp/phttpget-in";
 pthread_t phttpget_recv_thread;
 uint32_t phttpget_request_counter = 0;
+uint32_t phttpget_response_counter = 0;
 pthread_mutex_t phttpget_write_mutex = PTHREAD_MUTEX_INITIALIZER;
 TAILQ_HEAD(phttpget_request_queue, phttpget_request);
 struct phttpget_request_queue phttpget_requests_pending;
@@ -362,34 +363,34 @@ hnd2num(CURL *hnd)
 void *
 phttpget_recv_handler()
 {
-    int error = 0;
-    int buffer_filled = 0;
-    int read_len = 0;
-    int struct_len = sizeof(struct sctp_pipe_data);
     struct phttpget_request *request = NULL;
     struct sctp_pipe_data pipe_data_temp;
     uint8_t found = 0;
-    uint32_t response_counter = 0;
+    ssize_t len = 0;
+    ssize_t len_left = 0;
 
     if (debug && !json_output) {
         fprintf(stderr, "[%d][%s] - receiver thread started...\n", __LINE__, __func__);
     }
 
-    while ((read_len = read(fifo_in_fd, &pipe_data_temp, sizeof(struct sctp_pipe_data))) > 0) {
-        buffer_filled += read_len;
+    while (1) {
 
-        /* check if the have a complete struct */
-        if (buffer_filled < struct_len) {
-            if (debug && !json_output) {
-                fprintf(stderr, "[%d][%s] - did not read all data - outstanding: %d\n", __LINE__, __func__, struct_len - buffer_filled);
+        len_left = sizeof(struct sctp_pipe_data);
+        while (len_left > 0) {
+            len = read(fifo_in_fd, &pipe_data_temp + sizeof(struct sctp_pipe_data) - len_left, len_left);
+
+            if (len == 0 || len == -1) {
+                fprintf(stderr, "[%d][%s] - read failed\n", __LINE__, __func__);
+                exit(EXIT_FAILURE);
             }
-            continue;
+
+            len_left -= len;
         }
 
         /* search for thread */
         found = 0;
         TAILQ_FOREACH(request, &phttpget_requests_pending, entries) {
-            if (request->pipe_data.request_id == pipe_data_temp.request_id) {
+            if (request->pipe_data.id == pipe_data_temp.id) {
                 found = 1;
                 break;
             }
@@ -397,26 +398,23 @@ phttpget_recv_handler()
 
         /* thread not found - this should not happen ... */
         if (!found) {
-            fprintf(stderr, "[%d][%s] - request %d (%s) not found - read_len : %d - fix logic!!\n", __LINE__, __func__, pipe_data_temp.request_id, pipe_data_temp.path, read_len);
+            fprintf(stderr, "[%d][%s] - request %d (%s) not found - fix logic!!\n", __LINE__, __func__, pipe_data_temp.id, pipe_data_temp.path);
             exit(EXIT_FAILURE);
         }
 
         /* copy pipe_data */
         /* felix : ugly - todo! ... */
         memcpy(&(request->pipe_data), &pipe_data_temp, sizeof(struct sctp_pipe_data));
-        response_counter++;
 
-        if (debug && !json_output) {
-            fprintf(stderr, "handling response %d - %s\n", response_counter, request->pipe_data.path);
-        }
+        /*if (debug && !json_output) {
+            fprintf(stderr, "handling response %d - %s\n", request->pipe_data.id, request->pipe_data.path);
+        }*/
 
         /* notify waiting thread */
         pthread_mutex_lock(&(request->recv_mutex));
         request->got_response = 1;
         pthread_cond_signal(&(request->recv_cv));
         pthread_mutex_unlock(&(request->recv_mutex));
-
-        buffer_filled = 0;
     }
 
     if (debug && !json_output) {
@@ -427,46 +425,47 @@ phttpget_recv_handler()
 }
 
 /*
-** request an url via pipe and phttpget
+** request an url via phttpget pipe
 */
 
 void *
-phttpget_request_url(void *arg) {
-    cJSON *obj_name = arg;
-    int i = cJSON_HasArrayItem(this_objs_array, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
+phttpget_request_url(void *arg)
+{
+    cJSON *obj_name = NULL;
+    int i = 0;
     struct timeval te;
     double end_time = 0.0;
-    int num = 0;
     uint32_t bytes = 0;
     long total_bytes = 0;
     long header_bytes = 0;
     double transfer_time = 0.0;
-    int res = 0;
     struct phttpget_request *request = NULL;
+    cJSON *obj = NULL;
+    cJSON *this_obj = NULL;
+    ssize_t len = 0;
+    ssize_t len_left = 0;
 
+    obj_name = arg;
+    i = cJSON_HasArrayItem(this_objs_array, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
 
-    if (i != -1){
-        cJSON *obj = cJSON_GetArrayItem(this_objs_array, i);
-        cJSON *this_obj = cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
+    if (i != -1) {
+        obj = cJSON_GetArrayItem(this_objs_array, i);
+        this_obj = cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
 
-        gettimeofday(&te, NULL);
-        end_time = ((te.tv_sec - start.tv_sec) * 1000 + (double)(te.tv_usec - start.tv_usec) / 1000);
-        if (debug && !json_output) {
-            printf("[%f] URL: %s\n", end_time, cJSON_GetObjectItem(this_obj, "path")->valuestring);
-        }
-
-        /* queue request for later usage */
-
+        /* prepare request and enqueue to queue */
         if ((request = malloc(sizeof(struct phttpget_request))) == NULL) {
             fprintf(stderr, "[%d][%s] - malloc failed\n", __LINE__, __func__);
             exit(EXIT_FAILURE);
         }
         memset(request, 0, sizeof(struct phttpget_request));
 
-        /* initialize mutex */
+        /* initialize mutex for this thread */
         pthread_mutex_init(&(request->recv_mutex), NULL);
         pthread_cond_init(&(request->recv_cv), NULL);
         request->got_response = 0;
+
+        /* fill pipe data */
+        /* write url to buffer and save length */
         request->pipe_data.pathlen = snprintf(
             request->pipe_data.path,
             FIFO_BUFFER_SIZE,
@@ -475,53 +474,70 @@ phttpget_request_url(void *arg) {
             "path")->valuestring
         );
 
+        /* check pathlen */
+        if (request->pipe_data.pathlen <= 0) {
+            fprintf(stderr, "[%d][%s] - pathlen <= 0\n", __LINE__, __func__);
+            exit(EXIT_FAILURE);
+        }
 
         pthread_mutex_lock(&phttpget_write_mutex);
-        request->pipe_data.request_id = phttpget_request_counter++;
-        /* add request to queue */
+        phttpget_request_counter++;
+        request->pipe_data.id = phttpget_request_counter;
+        /* enqueue request */
         TAILQ_INSERT_TAIL(&phttpget_requests_pending, request, entries);
 
         /* write request to pipe */
-        if (request->pipe_data.pathlen > 0) {
-            if (write(fifo_out_fd, &(request->pipe_data), sizeof(struct sctp_pipe_data)) != sizeof(struct sctp_pipe_data)) {
+        len_left = sizeof(struct sctp_pipe_data);
+        while (len_left > 0) {
+            len = write(fifo_out_fd, &(request->pipe_data) + sizeof(struct sctp_pipe_data) - len_left, len_left);
+            if (len == -1 || len == 0) {
                 fprintf(stderr, "[%d][%s] - write failed\n", __LINE__, __func__);
-                exit(EXIT_FAILURE);
+                //exit(EXIT_FAILURE);
+                break;
             }
+            len_left -= len;
         }
         pthread_mutex_unlock(&phttpget_write_mutex);
 
-        fprintf(stderr, "[%d][%s] - requesting %d : %s\n", __LINE__, __func__, request->pipe_data.request_id, request->pipe_data.path);
+        /*
+        fprintf(stderr, "[%d][%s] - requesting %d : %s\n", __LINE__, __func__, request->pipe_data.id, request->pipe_data.path);
+        */
 
         /* wait for receiver thread */
         pthread_mutex_lock(&(request->recv_mutex));
-        while (!request->got_response)
+        while (!request->got_response) {
             pthread_cond_wait(&(request->recv_cv), &(request->recv_mutex));
+        }
         pthread_mutex_unlock(&(request->recv_mutex));
 
-        /* cleanup */
-        pthread_mutex_destroy(&(request->recv_mutex));
-        pthread_cond_destroy(&(request->recv_cv));
+        phttpget_response_counter++;
 
+        /*
         if (debug && !json_output) {
             printf("####### PHTTPGET\n");
-            printf("id      : %d\n", request->pipe_data.request_id);
+            printf("response: %d\n", phttpget_response_counter);
+            printf("id      : %d\n", request->pipe_data.id);
             printf("payload : %d\n", request->pipe_data.size_payload);
             printf("header  : %d\n", request->pipe_data.size_header);
         }
+        */
+
+        /* cleanup and statistics */
+        pthread_mutex_destroy(&(request->recv_mutex));
+        pthread_cond_destroy(&(request->recv_cv));
 
         gettimeofday(&te, NULL);
+
         pthread_mutex_lock(&lock);
         page_load_time = end_time= ((te.tv_sec - start.tv_sec) * 1000 + (double)(te.tv_usec - start.tv_usec) / 1000);
 
         total_bytes = request->pipe_data.size_payload + request->pipe_data.size_header;
         page_size += request->pipe_data.size_payload;
 
-        /* remove request from queue and free */
         TAILQ_REMOVE(&phttpget_requests_pending, request, entries);
-        free(request);
-
         object_count++;
-        pthread_mutex_unlock(&lock);
+
+        free(request);
 
         if (json_output == 1) {
             if (first_object==0){
@@ -531,6 +547,7 @@ phttpget_request_url(void *arg) {
                 printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
             }
         }
+        pthread_mutex_unlock(&lock);
 
         if (debug && !json_output) {
             printf("[%f] Object_size: %ld, transfer_time: %f\n", end_time, (long)bytes+header_bytes, transfer_time);
@@ -538,28 +555,19 @@ phttpget_request_url(void *arg) {
 
         onComplete(obj_name);
 
+        /* reduce thread_count and signal finish */
         pthread_mutex_lock(&thread_count_mutex);
-
         thread_count--;
-        /*if (thread_count==0){
-            printf("BECOME 0 in request_url\n");
-                fflush(stdout);
-        }*/
-
         pthread_cond_signal(&thread_count_cv);
         pthread_mutex_unlock(&thread_count_mutex);
-
-
 
     } else {
         if (debug && !json_output) {
             fprintf(stderr, "[%d][%s] - object not found - fix file!!!...\n", __LINE__, __func__);
             exit(EXIT_FAILURE);
         }
-
     }
     return 0;
-
 }
 
 void *
@@ -763,9 +771,11 @@ request_url(void *arg)
 int
 cJSON_HasArrayItem(cJSON *array, const char *string)
 {
+    cJSON *obj = NULL;
     int i;
+
     for (i = 0; i < cJSON_GetArraySize(array); i++) {
-        cJSON * obj = cJSON_GetArrayItem(array, i);
+        obj = cJSON_GetArrayItem(array, i);
         if (cJSON_HasObjectItem(obj, string)) {
             return i;
         }
@@ -913,6 +923,7 @@ void
     cJSON *trigger = arg;
     setTimeout(cJSON_GetObjectItem(trigger, "time")->valueint, cJSON_GetObjectItem(trigger, "id")->valuestring);
     createActivity(cJSON_GetObjectItem(trigger, "id")->valuestring);
+
     pthread_mutex_lock(&thread_count_mutex);
     thread_count--;
     if (thread_count==0){
