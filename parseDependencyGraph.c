@@ -36,6 +36,7 @@ int thread_count                    = 0;
 #define NUM_HANDLES 1000
 #define EASY_HANDLES 100
 #define FIFO_BUFFER_SIZE 1024
+#define STRING_BUFFER 1024
 #define NANOSLEEP_MS_MULTIPLIER  1000000  // 1 millisecond = 1,000,000 Nanoseconds
 
 #ifndef CURLPIPE_MULTIPLEX
@@ -108,6 +109,7 @@ int fifo_out_fd = -1;
 char *fifo_in_name = "/tmp/phttpget-out";
 char *fifo_out_name = "/tmp/phttpget-in";
 pthread_t phttpget_recv_thread;
+pthread_t phttpget_program_thread;
 uint32_t phttpget_request_counter = 0;
 uint32_t phttpget_response_counter = 0;
 pthread_mutex_t phttpget_write_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -354,6 +356,20 @@ hnd2num(CURL *hnd)
         }
     }
     return 0; /* weird, but just a fail-safe */
+}
+
+void *
+phttpget_start_programm() {
+    char phttpget_argument[STRING_BUFFER];
+    int phttpget_pid = 0;
+
+    /* try to run phttpget in background */
+    snprintf(phttpget_argument, STRING_BUFFER, "HTTP_PIPE=YES ./phttpget %s", server);
+    system(phttpget_argument);
+
+    fprintf(stderr, "phttpget terminated .... should not see me!\n");
+    exit(EXIT_FAILURE);
+    return 0;
 }
 
 /*
@@ -1317,8 +1333,6 @@ doit(char *text)
 }
 
 
-
-
 /* Read a file, parse, render back, etc. */
 void
 dofile(char *filename)
@@ -1377,6 +1391,9 @@ int main (int argc, char * argv[]) {
             protocol = PHTTPGET;
 
             TAILQ_INIT(&phttpget_requests_pending);
+
+            pthread_create(&phttpget_program_thread, NULL, phttpget_start_programm, NULL);
+            pthread_detach(phttpget_program_thread);
 
             /* create pipes for phttpget */
             mkfifo(fifo_out_name, 0666);
