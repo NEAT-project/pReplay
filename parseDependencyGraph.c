@@ -72,7 +72,7 @@ void createActivity(char *job_id);
 int cJSON_HasArrayItem(cJSON *array, const char *string);
 void onComplete(cJSON *obj_name);
 
-int debug = 1;
+int debug = 0;
 double page_load_time = 0.0;
 unsigned long page_size = 0;
 int json_output = 0;
@@ -227,7 +227,6 @@ run_worker(void *arg)
 
         pthread_mutex_lock(&lock);
         while (1) {
-            fprintf(stderr, "searching\n");
             for (i = 0; i < max_con; i++) {
                 if (worker_status[i] == 0){
                     idle_worker_found = 1;
@@ -957,7 +956,7 @@ createActivity(char *job_id)
         pthread_mutex_lock(&lock);
         if (cJSON_HasObjectItem(obj_name, "is_started")){
             if (cJSON_GetObjectItem(obj_name, "is_started")->valueint == 1) {
-                fprintf(stderr, "%s : activity already started ... fix logic?\n", cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
+                //fprintf(stderr, "%s : activity already started ... fix logic?\n", cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
                 //exit(EXIT_FAILURE);
                 duplicate_job = 1;
             } else {
