@@ -16,6 +16,7 @@ written by-- Mohd Rajiullah*/
 #include <curl/curl.h>
 #include <sys/time.h>
 #include "cJSON.h"
+#include <stdint.h>
 
 pthread_mutex_t count_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t count_threshold_cv = PTHREAD_COND_INITIALIZER;
