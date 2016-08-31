@@ -1114,21 +1114,23 @@ void
 doit(char *text)
 {
    json = cJSON_Parse(text);
-   int i,j;
-   char *out, *a1;
+   int i = 0;
+   int j = 0;
+   char *out = NULL;
+   char *a1 = NULL;
    char dep_id[16];
-   int deps_length;
-   cJSON *comp;
-   cJSON *this_objs;
-   cJSON *temp1;
-   cJSON *temp2;
-   cJSON *this_acts;
-   cJSON *comps;
-   cJSON *root;
-   cJSON *b1;
-   cJSON *b2;
-   cJSON *temp;
-   cJSON *temp_array;
+   int deps_length = 0;
+   cJSON *comp = NULL;
+   cJSON *this_objs = NULL;
+   cJSON *temp1 = NULL;
+   cJSON *temp2 = NULL;
+   cJSON *this_acts = NULL;
+   cJSON *comps = NULL;
+   cJSON *root = NULL;
+   cJSON *b1 = NULL;
+   cJSON *b2 = NULL;
+   cJSON *temp = NULL;
+   cJSON *temp_array = NULL;
 
    if (!json) {
        printf("Error before: [%s]\n", cJSON_GetErrorPtr());
@@ -1328,6 +1330,7 @@ dofile(char *filename)
     FILE *f;
     long len;
     char *data;
+    ssize_t result;
 
     f = fopen(filename,"rb");
     if (f == NULL) {
@@ -1338,8 +1341,19 @@ dofile(char *filename)
     fseek(f, 0, SEEK_END);
     len = ftell(f);
     fseek(f, 0, SEEK_SET);
+
     data = (char*)malloc(len + 1);
-    fread(data, 1, len, f);
+    if (data == NULL) {
+        fprintf(stderr, "malloc failed\n");
+        exit(EXIT_FAILURE);
+    }
+
+    result = fread(data, 1, len, f);
+    if (result != len) {
+        fprintf(stderr, "fread failed\n");
+        exit(EXIT_FAILURE);
+    }
+
     fclose(f);
     doit(data);
     free(data);
