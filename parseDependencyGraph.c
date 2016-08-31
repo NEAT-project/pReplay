@@ -591,11 +591,9 @@ onComplete(cJSON *obj_name)
     }
 
     // TO DO update task completion maps
-    pthread_mutex_lock(&lock);
     if (!cJSON_HasObjectItem(map_complete, cJSON_GetObjectItem(obj_name, "id")->valuestring)) {
         cJSON_AddNumberToObject(map_complete, cJSON_GetObjectItem(obj_name, "id")->valuestring, 1);
     }
-    pthread_mutex_unlock(&lock);
 
     // Check whether should trigger dependent activities when 'time' == -1
     if (cJSON_HasObjectItem(obj_name, "triggers")) {
@@ -785,11 +783,9 @@ createActivity(char *job_id)
                 pthread_detach(tid1);
         }
         // TO DO update task start maps
-        pthread_mutex_lock(&lock);
         if (!cJSON_HasObjectItem(map_start, cJSON_GetObjectItem(obj_name, "id")->valuestring)) {
             cJSON_AddNumberToObject(map_start, cJSON_GetObjectItem(obj_name, "id")->valuestring,1);
         }
-        pthread_mutex_unlock(&lock);
 
         // Check whether should trigger dependent activities when 'time' != -1
         if (cJSON_HasObjectItem(obj_name, "triggers")) {
