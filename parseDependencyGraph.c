@@ -50,7 +50,7 @@ void createActivity(char *job_id);
 int cJSON_HasArrayItem(cJSON *array, const char *string);
 void onComplete(cJSON *obj_name);
 
-int debug = 1;
+int debug = 0;
 double page_load_time = 0.0;
 unsigned long page_size = 0;
 int json_output = 0;
@@ -75,9 +75,7 @@ int protocol = HTTP1;
 int request_count = 0;
 int max_con = 0;
 CURL *easyh1[EASY_HANDLES];
-//CURL *easyh1;
 int *worker_status;
-//int worker_status[max_con] = {0, 0, 0, 0, 0, 0};
 
 static size_t
 memory_callback(void *contents, size_t size, size_t nmemb, void *userp)
@@ -669,10 +667,10 @@ void
     createActivity(cJSON_GetObjectItem(trigger, "id")->valuestring);
     pthread_mutex_lock(&count_mutex);
     thread_count--;
-    if (thread_count==0){
+    /*if (thread_count==0){
         printf("BECOME 0 in createActivityAfterTimeout\n");
     fflush(stdout);
-     }
+     }*/
      if (thread_count==0){
          pthread_cond_signal(&count_threshold_cv);
       }
@@ -690,23 +688,31 @@ createActivity(char *job_id)
     struct timeval ts_s;
     cJSON * obj;
     cJSON * obj_name;
-
+    uint8_t duplicate_job = 0;
 
     int i = cJSON_HasArrayItem(this_acts_array, job_id);
     if (i != -1){
         obj = cJSON_GetArrayItem(this_acts_array, i);
         obj_name = cJSON_GetObjectItem(obj, job_id);
 
+        pthread_mutex_lock(&lock);
         if (cJSON_HasObjectItem(obj_name, "is_started")){
             if (cJSON_GetObjectItem(obj_name, "is_started")->valueint == 1) {
-                return;
+                //return;
+                //fprintf(stderr, "%s : activity already started ... fix logic?\n", cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
+                duplicate_job = 1;
             } else {
                 cJSON_GetObjectItem(obj_name,"is_started")->valueint = 1;
             }
         } else {
+            
             cJSON_AddNumberToObject(obj_name,"is_started",1);
+            
         }
-
+        pthread_mutex_unlock(&lock);
+        if (duplicate_job) {
+                   return;
+               }
 
         gettimeofday(&ts_s, NULL);
         cJSON_AddNumberToObject(
@@ -822,19 +828,12 @@ run()
     createActivity(cJSON_GetObjectItem(json,"start_activity")->valuestring);
 
 
-    /*printf("Start to wait...\n");
-    fflush(stdout);*/
     pthread_cond_wait(&count_threshold_cv,&count_threshold_mutex);
-    /*printf("After waiting...\n");
-    fflush(stdout);*/
     printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",
         object_count,
         page_load_time,
         page_size);
 
-    //pthread_create(&thd,NULL,watch_threads, (void *) thread_ids);
-    //sleep(5);
-    //printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",object_count,page_load_time,page_size);
 
 
 }
