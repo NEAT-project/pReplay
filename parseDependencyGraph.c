@@ -16,20 +16,26 @@ written by-- Mohd Rajiullah*/
 #include <curl/curl.h>
 #include <sys/time.h>
 #include "cJSON.h"
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/queue.h>
 
-pthread_mutex_t count_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t count_threshold_cv = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t count_threshold_mutex;
-
-int thread_count=0;
-int first_download=0;
+pthread_mutex_t thread_count_mutex  = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t thread_count_cv      = PTHREAD_COND_INITIALIZER;
+int thread_count                    = 0;
 
 #define HTTP1 1
 #define HTTP2 2
 #define HTTPS 3
+#define PHTTPGET 4
 #define COOKIE_SIZE 512
 #define NUM_HANDLES 1000
 #define EASY_HANDLES 100
+#define FIFO_BUFFER_SIZE 1024
 #define NANOSLEEP_MS_MULTIPLIER  1000000  // 1 millisecond = 1,000,000 Nanoseconds
 
 #ifndef CURLPIPE_MULTIPLEX
@@ -46,11 +52,27 @@ struct memory_chunk {
     int enabled;
 };
 
+struct sctp_pipe_data {
+    uint32_t    id;
+    uint32_t    pathlen;
+    uint32_t    size_header;
+    uint32_t    size_payload;
+    char        path[FIFO_BUFFER_SIZE];
+} __attribute__ ((packed));
+
+struct phttpget_request {
+    pthread_mutex_t recv_mutex;
+    pthread_cond_t recv_cv;
+    uint8_t got_response;
+    struct sctp_pipe_data pipe_data;
+    TAILQ_ENTRY(phttpget_request) entries;
+};
+
 void createActivity(char *job_id);
 int cJSON_HasArrayItem(cJSON *array, const char *string);
 void onComplete(cJSON *obj_name);
 
-int debug = 1;
+int debug = 0;
 double page_load_time = 0.0;
 unsigned long page_size = 0;
 int json_output = 0;
@@ -72,12 +94,26 @@ CURL *easy[NUM_HANDLES];
 CURLM *multi_handle = NULL;
 int num_transfers = 0;
 int protocol = HTTP1;
+int transport_protocol = IPPROTO_TCP;
 int request_count = 0;
 int max_con = 0;
 CURL *easyh1[EASY_HANDLES];
 //CURL *easyh1;
 int *worker_status;
 //int worker_status[max_con] = {0, 0, 0, 0, 0, 0};
+
+/* PHTTPGET STUFF BEGIN */
+int fifo_in_fd = -1;
+int fifo_out_fd = -1;
+char *fifo_in_name = "/tmp/phttpget-out";
+char *fifo_out_name = "/tmp/phttpget-in";
+pthread_t phttpget_recv_thread;
+uint32_t phttpget_request_counter = 0;
+uint32_t phttpget_response_counter = 0;
+pthread_mutex_t phttpget_write_mutex = PTHREAD_MUTEX_INITIALIZER;
+TAILQ_HEAD(phttpget_request_queue, phttpget_request);
+struct phttpget_request_queue phttpget_requests_pending;
+/* PHTTPGET STUFF END */
 
 static size_t
 memory_callback(void *contents, size_t size, size_t nmemb, void *userp)
@@ -115,6 +151,7 @@ init_worker()
 
         if ((res = curl_easy_setopt(easyh1[i], CURLOPT_TCP_NODELAY, 1L)) != CURLE_OK) {
             fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+            exit(EXIT_FAILURE);
         }
 
         /* some servers don't like requests that are made without a user-agent
@@ -122,6 +159,7 @@ init_worker()
          */
         if ((res = curl_easy_setopt(easyh1[i], CURLOPT_USERAGENT, "pReplay/0.1")) != CURLE_OK) {
             fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+            exit(EXIT_FAILURE);
         }
     }
     return 0;
@@ -142,15 +180,16 @@ init_tls_worker()
         if ((res = curl_easy_setopt(easyh1[i], CURLOPT_TCP_NODELAY, 1L)) != CURLE_OK ||
             (res = curl_easy_setopt(easyh1[i], CURLOPT_HEADER, 0L)) != CURLE_OK ||
             (res = curl_easy_setopt(easyh1[i], CURLOPT_SSL_VERIFYPEER, 0L)) != CURLE_OK ||
-            (res = curl_easy_setopt(easyh1[i], CURLOPT_SSL_VERIFYHOST, 0L)) != CURLE_OK)
-            {
+            (res = curl_easy_setopt(easyh1[i], CURLOPT_SSL_VERIFYHOST, 0L)) != CURLE_OK) {
             fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+            exit(EXIT_FAILURE);
             }
 
             /* some servers don't like requests that are made without a user-agent
              * field, so we provide one */
         if ((res = curl_easy_setopt(easyh1[i], CURLOPT_USERAGENT, "pReplay/0.1")) != CURLE_OK) {
             fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+            exit(EXIT_FAILURE);
         }
     }
     return 0;
@@ -187,7 +226,7 @@ run_worker(void *arg)
         }
 
         pthread_mutex_lock(&lock);
-        while(1) {
+        while (1) {
             for (i = 0; i < max_con; i++) {
                 if (worker_status[i] == 0){
                     idle_worker_found = 1;
@@ -203,10 +242,12 @@ run_worker(void *arg)
 
         if ((res = curl_easy_setopt(easyh1[i], CURLOPT_WRITEFUNCTION, memory_callback)) != CURLE_OK) {
             fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+            exit(EXIT_FAILURE);
         }
 
         if ((res = curl_easy_setopt(easyh1[i], CURLOPT_WRITEDATA, (void *)&chunk)) != CURLE_OK) {
             fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
+            exit(EXIT_FAILURE);
         }
 
 
@@ -225,27 +266,30 @@ run_worker(void *arg)
         if ((res=curl_easy_perform(easyh1[i])) != CURLE_OK){
             //fprintf(stderr, "i= %d\n", i);
             perror("Curl error");
+            exit(EXIT_FAILURE);
         }
 
-        worker_status[i]=0;
+
 
         if ((res = curl_easy_getinfo(easyh1[i], CURLINFO_SIZE_DOWNLOAD, &bytes)) != CURLE_OK ||
             (res = curl_easy_getinfo(easyh1[i], CURLINFO_HEADER_SIZE, &header_bytes)) != CURLE_OK ||
             (res = curl_easy_getinfo(easyh1[i], CURLINFO_TOTAL_TIME, &transfer_time)) != CURLE_OK )
             {
             fprintf(stderr, "cURL error: %s\n", curl_easy_strerror(res));
+            exit(EXIT_FAILURE);
         }
 
+        worker_status[i] = 0;
 
-    gettimeofday(&te,NULL);
-    pthread_mutex_lock(&lock);
-    page_load_time=end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
-    pthread_mutex_unlock(&lock);
-    total_bytes=(long)bytes+header_bytes;
-    page_size+=(long)bytes;
+
+        gettimeofday(&te,NULL);
+        pthread_mutex_lock(&lock);
+        page_load_time=end_time=((te.tv_sec-start.tv_sec)*1000+(double)(te.tv_usec-start.tv_usec)/1000);
+
+        total_bytes=(long)bytes+header_bytes;
+        page_size+=(long)bytes;
 
         object_count++;
-
         if (json_output == 1) {
             if (first_object == 0) {
                 printf("{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
@@ -254,6 +298,7 @@ run_worker(void *arg)
                 printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
             }
         }
+        pthread_mutex_unlock(&lock);
 
         if (debug == 1) {
             fprintf(stderr, "[%f] Object_size: %ld, transfer_time: %f\n",
@@ -263,21 +308,20 @@ run_worker(void *arg)
         }
 
         onComplete(obj_name);
-    pthread_mutex_lock(&count_mutex);
-    if (first_download==0){
-        first_download=1;
-    }else{
-        thread_count--;
-    }
-    /*if (thread_count==0){
-        printf("BECOME 0 in run_worker\n");
-        fflush(stdout);
-    }*/
 
-    if (thread_count==0){
-        pthread_cond_signal(&count_threshold_cv);
-    }
-    pthread_mutex_unlock(&count_mutex);
+        pthread_mutex_lock(&thread_count_mutex);
+        thread_count--;
+        /*if (thread_count==0){
+            printf("BECOME 0 in run_worker\n");
+            fflush(stdout);
+        }*/
+
+        pthread_cond_signal(&thread_count_cv);
+        pthread_mutex_unlock(&thread_count_mutex);
+
+
+
+
     }
     return 0;
 }
@@ -312,10 +356,221 @@ hnd2num(CURL *hnd)
     return 0; /* weird, but just a fail-safe */
 }
 
-/* FELIX: refactoring */
+/*
+** read from incoming pipe and notify coresponding thread
+*/
+void *
+phttpget_recv_handler()
+{
+    struct phttpget_request *request = NULL;
+    struct sctp_pipe_data pipe_data_temp;
+    uint8_t found = 0;
+    ssize_t len = 0;
+    ssize_t len_left = 0;
+
+    if (debug && !json_output) {
+        fprintf(stderr, "[%d][%s] - receiver thread started...\n", __LINE__, __func__);
+    }
+
+    while (1) {
+
+        len_left = sizeof(struct sctp_pipe_data);
+        while (len_left > 0) {
+            len = read(fifo_in_fd, &pipe_data_temp + sizeof(struct sctp_pipe_data) - len_left, len_left);
+
+            if (len == 0 || len == -1) {
+                fprintf(stderr, "[%d][%s] - read failed\n", __LINE__, __func__);
+                exit(EXIT_FAILURE);
+            }
+
+            len_left -= len;
+        }
+
+        /* search for thread */
+        found = 0;
+        TAILQ_FOREACH(request, &phttpget_requests_pending, entries) {
+            if (request->pipe_data.id == pipe_data_temp.id) {
+                found = 1;
+                break;
+            }
+        }
+
+        /* thread not found - this should not happen ... */
+        if (!found) {
+            fprintf(stderr, "[%d][%s] - request %d (%s) not found - fix logic!!\n", __LINE__, __func__, pipe_data_temp.id, pipe_data_temp.path);
+            exit(EXIT_FAILURE);
+        }
+
+        /* copy pipe_data */
+        /* felix : ugly - todo! ... */
+        memcpy(&(request->pipe_data), &pipe_data_temp, sizeof(struct sctp_pipe_data));
+
+        /*if (debug && !json_output) {
+            fprintf(stderr, "handling response %d - %s\n", request->pipe_data.id, request->pipe_data.path);
+        }*/
+
+        /* notify waiting thread */
+        pthread_mutex_lock(&(request->recv_mutex));
+        request->got_response = 1;
+        pthread_cond_signal(&(request->recv_cv));
+        pthread_mutex_unlock(&(request->recv_mutex));
+    }
+
+    if (debug && !json_output) {
+        fprintf(stderr, "[%d][%s] - read failed - read retured %d (%s)\n", __LINE__, __func__, errno, strerror(errno));
+    }
+
+    return 0;
+}
+
+/*
+** request an url via phttpget pipe
+*/
 
 void *
-request_url(void * arg)
+phttpget_request_url(void *arg)
+{
+    cJSON *obj_name = NULL;
+    int i = 0;
+    struct timeval te;
+    double end_time = 0.0;
+    uint32_t bytes = 0;
+    long total_bytes = 0;
+    long header_bytes = 0;
+    double transfer_time = 0.0;
+    struct phttpget_request *request = NULL;
+    cJSON *obj = NULL;
+    cJSON *this_obj = NULL;
+    ssize_t len = 0;
+    ssize_t len_left = 0;
+
+    obj_name = arg;
+    i = cJSON_HasArrayItem(this_objs_array, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
+
+    if (i != -1) {
+        obj = cJSON_GetArrayItem(this_objs_array, i);
+        this_obj = cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
+
+        /* prepare request and enqueue to queue */
+        if ((request = malloc(sizeof(struct phttpget_request))) == NULL) {
+            fprintf(stderr, "[%d][%s] - malloc failed\n", __LINE__, __func__);
+            exit(EXIT_FAILURE);
+        }
+        memset(request, 0, sizeof(struct phttpget_request));
+
+        /* initialize mutex for this thread */
+        pthread_mutex_init(&(request->recv_mutex), NULL);
+        pthread_cond_init(&(request->recv_cv), NULL);
+        request->got_response = 0;
+
+        /* fill pipe data */
+        /* write url to buffer and save length */
+        request->pipe_data.pathlen = snprintf(
+            request->pipe_data.path,
+            FIFO_BUFFER_SIZE,
+            "%s",
+            cJSON_GetObjectItem(this_obj,
+            "path")->valuestring
+        );
+
+        /* check pathlen */
+        if (request->pipe_data.pathlen <= 0) {
+            fprintf(stderr, "[%d][%s] - pathlen <= 0\n", __LINE__, __func__);
+            exit(EXIT_FAILURE);
+        }
+
+        pthread_mutex_lock(&phttpget_write_mutex);
+        phttpget_request_counter++;
+        request->pipe_data.id = phttpget_request_counter;
+        /* enqueue request */
+        TAILQ_INSERT_TAIL(&phttpget_requests_pending, request, entries);
+
+        /* write request to pipe */
+        len_left = sizeof(struct sctp_pipe_data);
+        while (len_left > 0) {
+            len = write(fifo_out_fd, &(request->pipe_data) + sizeof(struct sctp_pipe_data) - len_left, len_left);
+            if (len == -1 || len == 0) {
+                fprintf(stderr, "[%d][%s] - write failed\n", __LINE__, __func__);
+                //exit(EXIT_FAILURE);
+                break;
+            }
+            len_left -= len;
+        }
+        pthread_mutex_unlock(&phttpget_write_mutex);
+
+        /*
+        fprintf(stderr, "[%d][%s] - requesting %d : %s\n", __LINE__, __func__, request->pipe_data.id, request->pipe_data.path);
+        */
+
+        /* wait for receiver thread */
+        pthread_mutex_lock(&(request->recv_mutex));
+        while (!request->got_response) {
+            pthread_cond_wait(&(request->recv_cv), &(request->recv_mutex));
+        }
+        pthread_mutex_unlock(&(request->recv_mutex));
+
+        phttpget_response_counter++;
+
+        /*
+        if (debug && !json_output) {
+            printf("####### PHTTPGET\n");
+            printf("response: %d\n", phttpget_response_counter);
+            printf("id      : %d\n", request->pipe_data.id);
+            printf("payload : %d\n", request->pipe_data.size_payload);
+            printf("header  : %d\n", request->pipe_data.size_header);
+        }
+        */
+
+        /* cleanup and statistics */
+        pthread_mutex_destroy(&(request->recv_mutex));
+        pthread_cond_destroy(&(request->recv_cv));
+
+        gettimeofday(&te, NULL);
+
+        pthread_mutex_lock(&lock);
+        page_load_time = end_time= ((te.tv_sec - start.tv_sec) * 1000 + (double)(te.tv_usec - start.tv_usec) / 1000);
+
+        total_bytes = request->pipe_data.size_payload + request->pipe_data.size_header;
+        page_size += request->pipe_data.size_payload;
+
+        TAILQ_REMOVE(&phttpget_requests_pending, request, entries);
+        object_count++;
+
+        free(request);
+
+        if (json_output == 1) {
+            if (first_object==0){
+                printf("{\"S\":%ld,\"T\":%f}", total_bytes, transfer_time);
+                first_object = 1;
+            } else {
+                printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
+            }
+        }
+        pthread_mutex_unlock(&lock);
+
+        if (debug && !json_output) {
+            printf("[%f] Object_size: %ld, transfer_time: %f\n", end_time, (long)bytes+header_bytes, transfer_time);
+        }
+
+        onComplete(obj_name);
+
+        /* reduce thread_count and signal finish */
+        pthread_mutex_lock(&thread_count_mutex);
+        thread_count--;
+        pthread_cond_signal(&thread_count_cv);
+        pthread_mutex_unlock(&thread_count_mutex);
+
+    } else {
+        if (debug && !json_output) {
+            fprintf(stderr, "[%d][%s] - object not found - fix file!!!...\n", __LINE__, __func__);
+            exit(EXIT_FAILURE);
+        }
+    }
+    return 0;
+}
+
+void *
+request_url(void *arg)
 {
     cJSON *obj_name = arg;
     char url[400];
@@ -331,7 +586,7 @@ request_url(void * arg)
         FILE *out;
         char filename[128];
         int num=0;
-        double bytes,avj_obj_size = 0.0;
+        double bytes = 0.0;
         long total_bytes = 0;
         long header_bytes = 0;
         double transfer_time = 0.0;
@@ -479,11 +734,11 @@ request_url(void * arg)
         gettimeofday(&te, NULL);
         pthread_mutex_lock(&lock);
         page_load_time = end_time= ((te.tv_sec - start.tv_sec) * 1000 + (double)(te.tv_usec - start.tv_usec) / 1000);
-        pthread_mutex_unlock(&lock);
         total_bytes = (long)bytes + header_bytes;
         page_size += (long)bytes;
 
         object_count++;
+        pthread_mutex_unlock(&lock);
 
         if (json_output == 1) {
             if (first_object==0){
@@ -498,22 +753,16 @@ request_url(void * arg)
         }
 
         onComplete(obj_name);
-        pthread_mutex_lock(&count_mutex);
+        pthread_mutex_lock(&thread_count_mutex);
 
-        if (first_download == 0) {
-            first_download = 1;
-        } else {
-            thread_count--;
-        }
+        thread_count--;
         /*if (thread_count==0){
             printf("BECOME 0 in request_url\n");
                 fflush(stdout);
         }*/
 
-        if (thread_count == 0){
-            pthread_cond_signal(&count_threshold_cv);
-        }
-        pthread_mutex_unlock(&count_mutex);
+        pthread_cond_signal(&thread_count_cv);
+        pthread_mutex_unlock(&thread_count_mutex);
     }
     return 0;
 }
@@ -521,9 +770,11 @@ request_url(void * arg)
 int
 cJSON_HasArrayItem(cJSON *array, const char *string)
 {
+    cJSON *obj = NULL;
     int i;
+
     for (i = 0; i < cJSON_GetArraySize(array); i++) {
-        cJSON * obj = cJSON_GetArrayItem(array, i);
+        obj = cJSON_GetArrayItem(array, i);
         if (cJSON_HasObjectItem(obj, string)) {
             return i;
         }
@@ -581,7 +832,7 @@ onComplete(cJSON *obj_name)
     pthread_mutex_unlock(&lock);
     cJSON_AddNumberToObject(obj_name, "ts_e", end_time);
 
-    if (debug == 1) {
+    if (debug) {
         printf("=== [onComplete][%f] {\"id\":%s,\"type\":%s,\"is_started\":%d,\"ts_s\":%f,\"ts_e\":%f}\n",
             end_time,
             cJSON_GetObjectItem(obj_name,"id")->valuestring,
@@ -591,10 +842,15 @@ onComplete(cJSON *obj_name)
             cJSON_GetObjectItem(obj_name,"ts_e")->valuedouble);
     }
 
+    pthread_mutex_lock(&lock);
     // TO DO update task completion maps
     if (!cJSON_HasObjectItem(map_complete, cJSON_GetObjectItem(obj_name, "id")->valuestring)) {
         cJSON_AddNumberToObject(map_complete, cJSON_GetObjectItem(obj_name, "id")->valuestring, 1);
+    } else {
+        fprintf(stderr, "dublicate object - fix logic!\n");
+        exit(EXIT_FAILURE);
     }
+    pthread_mutex_unlock(&lock);
 
     // Check whether should trigger dependent activities when 'time' == -1
     if (cJSON_HasObjectItem(obj_name, "triggers")) {
@@ -648,16 +904,15 @@ void
     //printf("Time out value: %d, object name: %s\n",cJSON_GetObjectItem(obj_name,"time")->valueint, cJSON_GetObjectItem(obj_name,"obj_id")->valuestring);
     setTimeout(cJSON_GetObjectItem(obj_name, "time")->valueint, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
     onComplete(obj_name);
-    pthread_mutex_lock(&count_mutex);
+    pthread_mutex_lock(&thread_count_mutex);
     thread_count--;
     /*if (thread_count==0){
         printf("BECOME 0 in compActivity\n");
     fflush(stdout);
     }*/
-    if (thread_count==0){
-    pthread_cond_signal(&count_threshold_cv);
-     }
-    pthread_mutex_unlock(&count_mutex);
+
+    pthread_cond_signal(&thread_count_cv);
+    pthread_mutex_unlock(&thread_count_mutex);
     return ((void*)0);
 }
 
@@ -667,16 +922,16 @@ void
     cJSON *trigger = arg;
     setTimeout(cJSON_GetObjectItem(trigger, "time")->valueint, cJSON_GetObjectItem(trigger, "id")->valuestring);
     createActivity(cJSON_GetObjectItem(trigger, "id")->valuestring);
-    pthread_mutex_lock(&count_mutex);
+
+    pthread_mutex_lock(&thread_count_mutex);
     thread_count--;
     if (thread_count==0){
         printf("BECOME 0 in createActivityAfterTimeout\n");
-    fflush(stdout);
-     }
-     if (thread_count==0){
-         pthread_cond_signal(&count_threshold_cv);
-      }
-     pthread_mutex_unlock(&count_mutex);
+        fflush(stdout);
+    }
+
+    pthread_cond_signal(&thread_count_cv);
+    pthread_mutex_unlock(&thread_count_mutex);
     return ((void*)0);
 }
 
@@ -685,26 +940,35 @@ void
 createActivity(char *job_id)
 {
     pthread_t tid1, tid2;
-    char url[400];
     int error;
     struct timeval ts_s;
     cJSON * obj;
     cJSON * obj_name;
+    uint8_t duplicate_job = 0;
 
 
     int i = cJSON_HasArrayItem(this_acts_array, job_id);
-    if (i != -1){
+
+    if (i != -1) {
         obj = cJSON_GetArrayItem(this_acts_array, i);
         obj_name = cJSON_GetObjectItem(obj, job_id);
 
+        pthread_mutex_lock(&lock);
         if (cJSON_HasObjectItem(obj_name, "is_started")){
             if (cJSON_GetObjectItem(obj_name, "is_started")->valueint == 1) {
-                return;
+                //fprintf(stderr, "%s : activity already started ... fix logic?\n", cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
+                //exit(EXIT_FAILURE);
+                duplicate_job = 1;
             } else {
                 cJSON_GetObjectItem(obj_name,"is_started")->valueint = 1;
             }
         } else {
             cJSON_AddNumberToObject(obj_name,"is_started",1);
+        }
+        pthread_mutex_unlock(&lock);
+
+        if (duplicate_job) {
+            return;
         }
 
 
@@ -726,54 +990,61 @@ createActivity(char *job_id)
         if (cJSON_strcasecmp(cJSON_GetObjectItem(obj_name, "type")->valuestring, "download") == 0) {
             i = cJSON_HasArrayItem(this_objs_array, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
 
-            if (i != -1){
+            if (i != -1) {
                 obj= cJSON_GetArrayItem(this_objs_array, i);
-                cJSON * this_obj= cJSON_GetObjectItem(obj, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
-
                 if (protocol == HTTP2) {
-            if (first_download==0){
-                        pthread_create(&tid2, NULL, request_url, (void *) obj_name);
-                        pthread_detach(tid2);
-            }else{
-            pthread_mutex_lock(&count_mutex);
-            thread_count++;
-            pthread_mutex_unlock(&count_mutex);
-                        pthread_create(&tid2, NULL, request_url, (void *) obj_name);
-                        pthread_detach(tid2);
-            }
-                } else if (protocol == HTTP1 || protocol == HTTPS){
-                      while(1){
-                            if (global_array_sum() < max_con) {
-                    if (first_download==0){
-                                        error = pthread_create(&tid2,NULL,run_worker,(void *)obj_name);
-                        pthread_detach(tid2);
-                        if (0 != error){
-                            fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
-                        }
-                    }else{
-                        pthread_mutex_lock(&count_mutex);
-                        thread_count++;
-                        pthread_mutex_unlock(&count_mutex);
-                        error = pthread_create(&tid2,NULL,run_worker,(void *)obj_name);
-                        pthread_detach(tid2);
-                        if (0 != error){
-                            fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
-                        }
+                    pthread_mutex_lock(&thread_count_mutex);
+                    thread_count++;
+                    pthread_cond_signal(&thread_count_cv);
+                    pthread_mutex_unlock(&thread_count_mutex);
+                    error = pthread_create(&tid2, NULL, request_url, (void *) obj_name);
+                    if (error) {
+                        fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
+                        exit(EXIT_FAILURE);
                     }
-                                break;
-                        }
-                    }
+                    pthread_detach(tid2);
 
+                } else if (protocol == HTTP1 || protocol == HTTPS) {
+                    while (1) {
+                        if (global_array_sum() < max_con) {
+                            pthread_mutex_lock(&thread_count_mutex);
+                            thread_count++;
+                            pthread_cond_signal(&thread_count_cv);
+                            pthread_mutex_unlock(&thread_count_mutex);
+                            error = pthread_create(&tid2,NULL,run_worker,(void *)obj_name);
+                            if (error) {
+                                fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
+                                exit(EXIT_FAILURE);
+                            }
+                            pthread_detach(tid2);
+                            break;
+                        }
+                    }
+                } else if (protocol == PHTTPGET) {
+                    pthread_mutex_lock(&thread_count_mutex);
+                    thread_count++;
+                    pthread_cond_signal(&thread_count_cv);
+                    pthread_mutex_unlock(&thread_count_mutex);
+                    error = pthread_create(&tid2, NULL, phttpget_request_url, (void *) obj_name);
+                    if (error) {
+                        fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
+                        exit(EXIT_FAILURE);
+                    }
+                    pthread_detach(tid2);
                 }
-
             }
         } else {
-        // For comp activity
-        pthread_mutex_lock(&count_mutex);
-        thread_count++;
-        pthread_mutex_unlock(&count_mutex);
-                pthread_create(&tid1, NULL, compActivity, (void *) obj_name);
-                pthread_detach(tid1);
+            // For comp activity
+            pthread_mutex_lock(&thread_count_mutex);
+            thread_count++;
+            pthread_cond_signal(&thread_count_cv);
+            pthread_mutex_unlock(&thread_count_mutex);
+            error = pthread_create(&tid1, NULL, compActivity, (void *) obj_name);
+            if (error) {
+                fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
+                exit(EXIT_FAILURE);
+            }
+            pthread_detach(tid1);
         }
         // TO DO update task start maps
         if (!cJSON_HasObjectItem(map_start, cJSON_GetObjectItem(obj_name, "id")->valuestring)) {
@@ -788,10 +1059,15 @@ createActivity(char *job_id)
                 if (cJSON_GetObjectItem(trigger, "time")->valueint != -1) {
                     // Check whether all activities that trigger.id depends on are finished
                     if (checkDependedActivities(cJSON_GetObjectItem(trigger, "id")->valuestring)){
-            pthread_mutex_lock(&count_mutex);
-            thread_count++;
-            pthread_mutex_unlock(&count_mutex);
-                        pthread_create(&tid2, NULL, createActivityAfterTimeout, (void *) trigger);
+                        pthread_mutex_lock(&thread_count_mutex);
+                        thread_count++;
+                        pthread_cond_signal(&thread_count_cv);
+                        pthread_mutex_unlock(&thread_count_mutex);
+                        error = pthread_create(&tid2, NULL, createActivityAfterTimeout, (void *) trigger);
+                        if (error) {
+                            fprintf(stderr, "Couldn't run thread number %d, errno %d\n", i, error);
+                            exit(EXIT_FAILURE);
+                        }
                         pthread_detach(tid2);
                     }
                 }
@@ -804,61 +1080,53 @@ createActivity(char *job_id)
 void
 run()
 {
-    struct timeval end;
-    pthread_t thd;
-    int thread_ids=1;
-    map_start=cJSON_CreateObject();
-    map_complete=cJSON_CreateObject();
-    if (protocol==HTTP1){
+    map_start = cJSON_CreateObject();
+    map_complete = cJSON_CreateObject();
+
+    if (protocol == HTTP1){
         init_worker();
-    }else if (protocol==HTTPS){
+    } else if (protocol == HTTPS){
         init_tls_worker();
     }
     gettimeofday(&start, NULL);
 
-    pthread_mutex_init(&count_threshold_mutex, NULL);
-    pthread_mutex_lock(&count_threshold_mutex);
-
     createActivity(cJSON_GetObjectItem(json,"start_activity")->valuestring);
 
+    pthread_mutex_lock(&thread_count_mutex);
+    while (thread_count > 0) {
+        pthread_cond_wait(&thread_count_cv, &thread_count_mutex);
+    }
+    pthread_mutex_unlock(&thread_count_mutex);
 
-    /*printf("Start to wait...\n");
-    fflush(stdout);*/
-    pthread_cond_wait(&count_threshold_cv,&count_threshold_mutex);
-    /*printf("After waiting...\n");
-    fflush(stdout);*/
     printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",
         object_count,
         page_load_time,
-        page_size);
-
-    //pthread_create(&thd,NULL,watch_threads, (void *) thread_ids);
-    //sleep(5);
-    //printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",object_count,page_load_time,page_size);
-
+        page_size
+    );
 
 }
 
 void
 doit(char *text)
 {
-   cJSON *temp_obj;
    json = cJSON_Parse(text);
-   int i,j;
-   char *out, *a1, *a2;
+   int i = 0;
+   int j = 0;
+   char *out = NULL;
+   char *a1 = NULL;
    char dep_id[16];
-   int deps_length;
-   cJSON *comp;
-   cJSON *this_objs;
-   cJSON *temp1;
-   cJSON *temp2;
-   cJSON *this_acts;
-   cJSON *comps;
-   cJSON *root;
-   cJSON *b1;
-   cJSON *b2;
-   cJSON *temp;
-   cJSON *temp_array;
+   int deps_length = 0;
+   cJSON *comp = NULL;
+   cJSON *this_objs = NULL;
+   cJSON *temp1 = NULL;
+   cJSON *temp2 = NULL;
+   cJSON *this_acts = NULL;
+   cJSON *comps = NULL;
+   cJSON *root = NULL;
+   cJSON *b1 = NULL;
+   cJSON *b2 = NULL;
+   cJSON *temp = NULL;
+   cJSON *temp_array = NULL;
 
    if (!json) {
        printf("Error before: [%s]\n", cJSON_GetErrorPtr());
@@ -1058,19 +1326,30 @@ dofile(char *filename)
     FILE *f;
     long len;
     char *data;
+    ssize_t result;
 
     f = fopen(filename,"rb");
     if (f == NULL) {
         perror("Error opening file\n");
-        exit(0);
+        exit(EXIT_FAILURE);
     }
 
-    // FELIX: refactoring!!! *WTF?!?!?!*
     fseek(f, 0, SEEK_END);
     len = ftell(f);
     fseek(f, 0, SEEK_SET);
+
     data = (char*)malloc(len + 1);
-    fread(data, 1, len, f);
+    if (data == NULL) {
+        fprintf(stderr, "malloc failed\n");
+        exit(EXIT_FAILURE);
+    }
+
+    result = fread(data, 1, len, f);
+    if (result != len) {
+        fprintf(stderr, "fread failed\n");
+        exit(EXIT_FAILURE);
+    }
+
     fclose(f);
     doit(data);
     free(data);
@@ -1078,12 +1357,8 @@ dofile(char *filename)
 
 
 int main (int argc, char * argv[]) {
-    int i;
-    char ch;
-
-
     if (argc < 3 || argc > 6){
-        fprintf(stderr,"usage: %s server testfile [http|https|http2] [max-connections][cookie-size]\n", argv[0]);
+        fprintf(stderr,"usage: %s server testfile [http|https|http2|phttpget] [max-connections] [cookie-size]\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
@@ -1098,8 +1373,22 @@ int main (int argc, char * argv[]) {
             protocol = HTTP1;
         } else if (strcmp(argv[3],"https") == 0) {
             protocol = HTTPS;
+        } else if (strcmp(argv[3],"phttpget") == 0) {
+            protocol = PHTTPGET;
+
+            TAILQ_INIT(&phttpget_requests_pending);
+
+            /* create pipes for phttpget */
+            mkfifo(fifo_out_name, 0666);
+            mkfifo(fifo_in_name, 0666);
+            fifo_out_fd = open(fifo_out_name, O_WRONLY);
+            fifo_in_fd = open(fifo_in_name, O_RDONLY);
+
+            /* start receiver thread */
+            pthread_create(&phttpget_recv_thread, NULL, phttpget_recv_handler, NULL);
+            pthread_detach(phttpget_recv_thread);
         } else {
-            printf("Not supported protocol.\n");
+            fprintf(stderr, "Protocol not supported\n");
             exit(EXIT_FAILURE);
         }
     }
@@ -1108,7 +1397,7 @@ int main (int argc, char * argv[]) {
     if (argc > 4){
         max_con = strtol(argv[4], NULL, 10);
         if (max_con < 1){
-            printf("Invalid number of connections\n");
+            fprintf(stderr, "Invalid number of connections\n");
             exit(EXIT_FAILURE);
         }
         worker_status = malloc(max_con * sizeof(worker_status[0]));
@@ -1151,8 +1440,12 @@ int main (int argc, char * argv[]) {
         }
     }
 
+
     dofile(testfile);
     pthread_mutex_destroy(&lock);
+
+    //sleep(2);
+
     //cJSON_Delete(json);
     return 0;
 }
