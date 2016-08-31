@@ -1084,7 +1084,6 @@ run()
     map_start = cJSON_CreateObject();
     map_complete = cJSON_CreateObject();
 
-
     if (protocol == HTTP1){
         init_worker();
     } else if (protocol == HTTPS){
@@ -1096,17 +1095,15 @@ run()
 
     pthread_mutex_lock(&thread_count_mutex);
     while (thread_count > 0) {
-        fprintf(stderr, "checking thread - active : %d\n", thread_count);
         pthread_cond_wait(&thread_count_cv, &thread_count_mutex);
     }
     pthread_mutex_unlock(&thread_count_mutex);
 
-    printf("############# run - finished!\n");
-
     printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",
         object_count,
         page_load_time,
-        page_size);
+        page_size
+    );
 
 }
 
