@@ -76,7 +76,7 @@ int debug = 0;
 int total_download_request_from_input=0;
 double page_load_time = 0.0;
 unsigned long page_size = 0;
-int json_output = 0;
+int json_output = 1;
 int object_count = 0;
 int first_object = 0;
 char *cookie_string;
@@ -88,6 +88,9 @@ cJSON *this_objs_array = NULL;
 cJSON *this_acts_array = NULL;
 cJSON *map_start = NULL;
 cJSON *map_complete = NULL;
+cJSON *json_for_output=NULL;
+cJSON *download_size=NULL;
+cJSON *temp_download_size=NULL;
 struct timeval start;
 pthread_mutex_t lock;
 void *curl_hnd[NUM_HANDLES];
@@ -293,12 +296,21 @@ run_worker(void *arg)
         object_count++;
         if (json_output == 1) {
             if (first_object == 0) {
-                printf("{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
+                //printf("{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
+                cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
+                cJSON_AddNumberToObject(temp_download_size,"S",total_bytes);
+                cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
                 first_object = 1;
             } else {
-                printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
+                cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
+                cJSON_AddNumberToObject(temp_download_size,"S",total_bytes);
+                cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
+               // printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
             }
         }
+        
+        
+
         pthread_mutex_unlock(&lock);
 
         if (debug == 1) {
@@ -539,14 +551,28 @@ phttpget_request_url(void *arg)
 
         free(request);
 
-        if (json_output == 1) {
+        /*if (json_output == 1) {
+
             if (first_object==0){
                 printf("{\"S\":%ld,\"T\":%f}", total_bytes, transfer_time);
                 first_object = 1;
             } else {
                 printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
             }
-        }
+        }*/
+
+        if (json_output == 1) {
+            if (first_object == 0) {
+                cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
+                cJSON_AddNumberToObject(temp_download_size,"S",total_bytes);
+                cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
+                first_object = 1;
+            } else {
+                cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
+                cJSON_AddNumberToObject(temp_download_size,"S",total_bytes);
+                cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
+            }
+        }    
         pthread_mutex_unlock(&lock);
 
         if (debug && !json_output) {
@@ -741,12 +767,26 @@ request_url(void *arg)
         object_count++;
         pthread_mutex_unlock(&lock);
 
-        if (json_output == 1) {
+        /*if (json_output == 1) {
             if (first_object==0){
                 printf("{\"S\":%ld,\"T\":%f}", total_bytes, transfer_time);
                 first_object = 1;
             } else {
                 printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
+            }
+        }*/
+        if (json_output == 1) {
+            if (first_object == 0) {
+                //printf("{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
+                cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
+                cJSON_AddNumberToObject(temp_download_size,"S",total_bytes);
+                cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
+                first_object = 1;
+            } else {
+                cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
+                cJSON_AddNumberToObject(temp_download_size,"S",total_bytes);
+                cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
+               // printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
             }
         }
         if (debug==1 && json_output==0) {
@@ -1091,6 +1131,7 @@ run()
     } else if (protocol == HTTPS){
         init_tls_worker();
     }
+
     gettimeofday(&start, NULL);
 
     createActivity(cJSON_GetObjectItem(json,"start_activity")->valuestring);
@@ -1105,13 +1146,24 @@ run()
     {
         fprintf(stderr, "Download error\n");
         EXIT_FAILURE;
+    }else{
+        cJSON_AddNumberToObject(json_for_output,"num_objects",object_count);
+        cJSON_AddNumberToObject(json_for_output,"PLT",page_load_time);
+        cJSON_AddNumberToObject(json_for_output,"page_size",page_size);
+
+        char *out;
+        out=cJSON_Print(json_for_output);
+        cJSON_Delete(json_for_output);
+        printf("%s\n", out);
+        free(out);
     }
 
-    printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",
+    /*printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",
         object_count,
         page_load_time,
         page_size
-    );
+    );*/
+
 
 }
 
@@ -1446,17 +1498,27 @@ int main (int argc, char * argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    json_for_output=cJSON_CreateObject();
+    download_size=cJSON_CreateArray();
+
     if (json_output == 1) {
         if (strrchr(testfile, '/') == NULL) {
-            printf("\"url_file\": \"%s\",\"OLT\":[", testfile);
+            cJSON_AddStringToObject(json_for_output,"url",testfile);
+           // printf("\"url_file\": \"%s\",\"OLT\":[", testfile);
         } else {
-            printf("\"url_file\": \"%s\",\"OLT\":[", strrchr(testfile, '/') + 1);
+            cJSON_AddStringToObject(json_for_output,"url",strrchr(testfile,'/')+1);
+            //printf("\"url_file\": \"%s\",\"OLT\":[", strrchr(testfile, '/') + 1);
         }
+        
     }
 
+    cJSON_AddStringToObject(json_for_output,"Protocol",argv[3]);
+    cJSON_AddItemToObject(json_for_output,"OLT",download_size);
 
     dofile(testfile);
     pthread_mutex_destroy(&lock);
+
+   
 
     //sleep(2);
 
