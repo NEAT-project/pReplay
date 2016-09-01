@@ -36,6 +36,7 @@ int thread_count                    = 0;
 #define NUM_HANDLES 1000
 #define EASY_HANDLES 100
 #define FIFO_BUFFER_SIZE 1024
+#define STRING_BUFFER 1024
 #define NANOSLEEP_MS_MULTIPLIER  1000000  // 1 millisecond = 1,000,000 Nanoseconds
 
 #ifndef CURLPIPE_MULTIPLEX
@@ -72,7 +73,7 @@ void createActivity(char *job_id);
 int cJSON_HasArrayItem(cJSON *array, const char *string);
 void onComplete(cJSON *obj_name);
 
-int debug = 0;
+int debug = 1;
 double page_load_time = 0.0;
 unsigned long page_size = 0;
 int json_output = 0;
@@ -108,6 +109,7 @@ int fifo_out_fd = -1;
 char *fifo_in_name = "/tmp/phttpget-out";
 char *fifo_out_name = "/tmp/phttpget-in";
 pthread_t phttpget_recv_thread;
+pthread_t phttpget_program_thread;
 uint32_t phttpget_request_counter = 0;
 uint32_t phttpget_response_counter = 0;
 pthread_mutex_t phttpget_write_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -356,6 +358,20 @@ hnd2num(CURL *hnd)
     return 0; /* weird, but just a fail-safe */
 }
 
+void *
+phttpget_start_programm() {
+    char phttpget_argument[STRING_BUFFER];
+    int phttpget_status = 0;
+
+    /* try to run phttpget in background */
+    snprintf(phttpget_argument, STRING_BUFFER, "HTTP_PIPE=YES ./phttpget %s", server);
+    phttpget_status = system(phttpget_argument);
+
+    fprintf(stderr, "phttpget terminated .... should not see me! - status : %d\n", phttpget_status);
+    exit(EXIT_FAILURE);
+    return 0;
+}
+
 /*
 ** read from incoming pipe and notify coresponding thread
 */
@@ -433,6 +449,8 @@ phttpget_request_url(void *arg)
     cJSON *obj_name = NULL;
     int i = 0;
     struct timeval te;
+    struct timeval time_request;
+    struct timeval time_response;
     double end_time = 0.0;
     uint32_t bytes = 0;
     long total_bytes = 0;
@@ -496,6 +514,7 @@ phttpget_request_url(void *arg)
             }
             len_left -= len;
         }
+        gettimeofday(&time_request, 0);
         pthread_mutex_unlock(&phttpget_write_mutex);
 
         /*
@@ -509,6 +528,8 @@ phttpget_request_url(void *arg)
         }
         pthread_mutex_unlock(&(request->recv_mutex));
 
+        gettimeofday(&time_response, 0);
+        transfer_time = ((time_response.tv_sec - time_request.tv_sec) * 1000 + (double)(time_response.tv_usec - time_request.tv_usec) / 1000);
         phttpget_response_counter++;
 
         /*
@@ -536,8 +557,6 @@ phttpget_request_url(void *arg)
         TAILQ_REMOVE(&phttpget_requests_pending, request, entries);
         object_count++;
 
-        free(request);
-
         if (json_output == 1) {
             if (first_object==0){
                 printf("{\"S\":%ld,\"T\":%f}", total_bytes, transfer_time);
@@ -546,11 +565,13 @@ phttpget_request_url(void *arg)
                 printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
             }
         }
-        pthread_mutex_unlock(&lock);
 
         if (debug && !json_output) {
-            printf("[%f] Object_size: %ld, transfer_time: %f\n", end_time, (long)bytes+header_bytes, transfer_time);
+            printf("[%f] Object_size: %u, transfer_time: %f\n", end_time, request->pipe_data.size_payload + request->pipe_data.size_header, transfer_time);
         }
+
+        free(request);
+        pthread_mutex_unlock(&lock);
 
         onComplete(obj_name);
 
@@ -1317,8 +1338,6 @@ doit(char *text)
 }
 
 
-
-
 /* Read a file, parse, render back, etc. */
 void
 dofile(char *filename)
@@ -1377,6 +1396,9 @@ int main (int argc, char * argv[]) {
             protocol = PHTTPGET;
 
             TAILQ_INIT(&phttpget_requests_pending);
+
+            pthread_create(&phttpget_program_thread, NULL, phttpget_start_programm, NULL);
+            pthread_detach(phttpget_program_thread);
 
             /* create pipes for phttpget */
             mkfifo(fifo_out_name, 0666);
