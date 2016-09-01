@@ -1512,7 +1512,7 @@ int main (int argc, char * argv[]) {
         
     }
 
-    cJSON_AddStringToObject(json_for_output,"Protocol",argv[3]);
+    //cJSON_AddStringToObject(json_for_output,"Protocol",argv[3]);
     cJSON_AddItemToObject(json_for_output,"OLT",download_size);
 
     dofile(testfile);
