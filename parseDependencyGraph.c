@@ -73,6 +73,7 @@ int cJSON_HasArrayItem(cJSON *array, const char *string);
 void onComplete(cJSON *obj_name);
 
 int debug = 0;
+int total_download_request_from_input=0;
 double page_load_time = 0.0;
 unsigned long page_size = 0;
 int json_output = 0;
@@ -1100,6 +1101,12 @@ run()
     }
     pthread_mutex_unlock(&thread_count_mutex);
 
+    if (total_download_request_from_input!=object_count)
+    {
+        fprintf(stderr, "Download error\n");
+        EXIT_FAILURE;
+    }
+
     printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",
         object_count,
         page_load_time,
@@ -1170,6 +1177,9 @@ doit(char *text)
         cJSON_AddStringToObject(temp1, "id",cJSON_GetObjectItem(obj, "id")->valuestring);
         cJSON_AddStringToObject(temp1, "host",cJSON_GetObjectItem(obj, "host")->valuestring);
         cJSON_AddStringToObject(temp1, "path",cJSON_GetObjectItem(obj, "path")->valuestring);
+        if (cJSON_GetObjectItem(obj,"path")->valuestring[0]!='\0'){
+            total_download_request_from_input++;
+        }
         cJSON_AddNumberToObject(temp1, "when_comp_start", cJSON_GetObjectItem(obj, "when_comp_start")->valueint);
         cJSON_AddItemReferenceToObject(temp1, "download",download);
         cJSON_AddItemReferenceToObject(temp1, "comps",comps);
@@ -1314,6 +1324,8 @@ doit(char *text)
         printf("%s\n", out);
         free(out);
     }
+
+    //printf("Total requests in the input %d\n",total_download_request_from_input );
 
     run();
 }
