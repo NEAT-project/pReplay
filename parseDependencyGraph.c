@@ -361,13 +361,13 @@ hnd2num(CURL *hnd)
 void *
 phttpget_start_programm() {
     char phttpget_argument[STRING_BUFFER];
-    int phttpget_pid = 0;
+    int phttpget_status = 0;
 
     /* try to run phttpget in background */
     snprintf(phttpget_argument, STRING_BUFFER, "HTTP_PIPE=YES ./phttpget %s", server);
-    system(phttpget_argument);
+    phttpget_status = system(phttpget_argument);
 
-    fprintf(stderr, "phttpget terminated .... should not see me!\n");
+    fprintf(stderr, "phttpget terminated .... should not see me! - status : %d\n", phttpget_status);
     exit(EXIT_FAILURE);
     return 0;
 }
@@ -569,7 +569,7 @@ phttpget_request_url(void *arg)
         if (debug && !json_output) {
             printf("[%f] Object_size: %u, transfer_time: %f\n", end_time, request->pipe_data.size_payload + request->pipe_data.size_header, transfer_time);
         }
-        
+
         free(request);
         pthread_mutex_unlock(&lock);
 
