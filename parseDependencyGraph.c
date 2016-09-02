@@ -73,7 +73,7 @@ void createActivity(char *job_id);
 int cJSON_HasArrayItem(cJSON *array, const char *string);
 void onComplete(cJSON *obj_name);
 
-int debug = 0;
+int debug = 1;
 int total_download_request_from_input=0;
 double page_load_time = 0.0;
 unsigned long page_size = 0;
@@ -396,7 +396,7 @@ phttpget_recv_handler()
     ssize_t len = 0;
     ssize_t len_left = 0;
 
-    if (debug && !json_output) {
+    if (debug) {
         fprintf(stderr, "[%d][%s] - receiver thread started...\n", __LINE__, __func__);
     }
 
@@ -444,7 +444,7 @@ phttpget_recv_handler()
         pthread_mutex_unlock(&(request->recv_mutex));
     }
 
-    if (debug && !json_output) {
+    if (debug) {
         fprintf(stderr, "[%d][%s] - read failed - read retured %d (%s)\n", __LINE__, __func__, errno, strerror(errno));
     }
 
@@ -582,8 +582,8 @@ phttpget_request_url(void *arg)
             }
         }
 
-        if (debug && !json_output) {
-            printf("[%f] Object_size: %u, transfer_time: %f\n", end_time, request->pipe_data.size_payload + request->pipe_data.size_header, transfer_time);
+        if (debug) {
+            fprintf(stderr,"[%f] Object_size: %u, transfer_time: %f\n", end_time, request->pipe_data.size_payload + request->pipe_data.size_header, transfer_time);
         }
 
         free(request);
@@ -598,7 +598,7 @@ phttpget_request_url(void *arg)
         pthread_mutex_unlock(&thread_count_mutex);
 
     } else {
-        if (debug && !json_output) {
+        if (debug) {
             fprintf(stderr, "[%d][%s] - object not found - fix file!!!...\n", __LINE__, __func__);
             exit(EXIT_FAILURE);
         }
@@ -637,8 +637,8 @@ request_url(void *arg)
 
         gettimeofday(&te, NULL);
         end_time = ((te.tv_sec - start.tv_sec) * 1000 + (double)(te.tv_usec - start.tv_usec) / 1000);
-        if (debug==1 && json_output==0) {
-            printf("[%f] URL: %s\n", end_time, url);
+        if (debug) {
+            fprintf(stderr,"[%f] URL: %s\n", end_time, url);
         }
 
 
@@ -791,8 +791,8 @@ request_url(void *arg)
                // printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
             }
         }
-        if (debug==1 && json_output==0) {
-            printf("[%f] Object_size: %ld, transfer_time: %f\n", end_time, (long)bytes+header_bytes, transfer_time);
+        if (debug) {
+            fprintf(stderr,"[%f] Object_size: %ld, transfer_time: %f\n", end_time, (long)bytes+header_bytes, transfer_time);
         }
 
         onComplete(obj_name);
@@ -876,7 +876,7 @@ onComplete(cJSON *obj_name)
     cJSON_AddNumberToObject(obj_name, "ts_e", end_time);
 
     if (debug) {
-        printf("=== [onComplete][%f] {\"id\":%s,\"type\":%s,\"is_started\":%d,\"ts_s\":%f,\"ts_e\":%f}\n",
+        fprintf(stderr,"=== [onComplete][%f] {\"id\":%s,\"type\":%s,\"is_started\":%d,\"ts_s\":%f,\"ts_e\":%f}\n",
             end_time,
             cJSON_GetObjectItem(obj_name,"id")->valuestring,
             cJSON_GetObjectItem(obj_name,"type")->valuestring,
@@ -919,8 +919,8 @@ setTimeout(int ms, char *s)
     struct timespec tim2;
 
     gettimeofday(&ts,NULL);
-    if (debug == 1 && json_output == 0) {
-        printf("Timeout starts (obj id %s): %f ms - sleeping for %d ms\n",
+    if (debug) {
+        fprintf(stderr,"Timeout starts (obj id %s): %f ms - sleeping for %d ms\n",
             s,
             ((ts.tv_sec - start.tv_sec) * 1000 + (double)(ts.tv_usec - start.tv_usec) / 1000),
             ms
@@ -932,8 +932,8 @@ setTimeout(int ms, char *s)
     nanosleep(&tim, &tim2);
 
     gettimeofday(&te, NULL);
-    if (debug == 1 && json_output == 0) {
-        printf("Timeout ends (obj id %s): %f ms \n",
+    if (debug) {
+        fprintf(stderr,"Timeout ends (obj id %s): %f ms \n",
             s,
             ((te.tv_sec - start.tv_sec) * 1000 + (double)(te.tv_usec - start.tv_usec) / 1000)
         );
@@ -1022,8 +1022,8 @@ createActivity(char *job_id)
             ((ts_s.tv_sec - start.tv_sec) * 1000 + (double)(ts_s.tv_usec - start.tv_usec) / 1000)
         );
 
-        if (debug == 1 && json_output == 0) {
-            printf("Object id: %s, type: %s started at %f ms\n",
+        if (debug) {
+            fprintf(stderr,"Object id: %s, type: %s started at %f ms\n",
                 cJSON_GetObjectItem(obj_name,"obj_id")->valuestring,
                 cJSON_GetObjectItem(obj_name,"type")->valuestring,
                 ((ts_s.tv_sec - start.tv_sec) * 1000 + (double)(ts_s.tv_usec - start.tv_usec) / 1000)
@@ -1366,15 +1366,15 @@ doit(char *text)
             cJSON_AddItemToObject(b1,"triggers", temp_array);
         }
     }
-    if (debug == 1 && json_output == 0) {
-        printf("===[objects]");
+    if (debug) {
+        fprintf(stderr,"===[objects]");
         out = cJSON_Print(this_objs_array);
-        printf("%s\n", out);
+        fprintf(stderr,"%s\n", out);
         free(out);
 
-        printf("===[activities]");
+        fprintf(stderr,"===[activities]");
         out=cJSON_Print(this_acts_array);
-        printf("%s\n", out);
+        fprintf(stderr,"%s\n", out);
         free(out);
     }
 
