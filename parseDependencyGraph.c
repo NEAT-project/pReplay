@@ -1420,68 +1420,54 @@ dofile(char *filename)
 
 
 int main (int argc, char * argv[]) {
-    if (argc < 3 || argc > 6){
-        fprintf(stderr,"usage: %s server testfile [http|https|http2|phttpget] [max-connections] [cookie-size]\n", argv[0]);
+
+    char* end;
+    if (argc < 7 ){
+        fprintf(stderr,"usage: %s server testfile [http|https|http2|phttpget] [max-connections] [cookie-size] [rtt] [plr] \n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
     server = argv[1];
     testfile = argv[2];
 
-    /* User defined a protocol via arguments - HTTP1 is default */
-    if (argc > 3) {
-        if (strcmp(argv[3], "http2") == 0) {
-            protocol = HTTP2;
-        } else if (strcmp(argv[3],"http") == 0) {
-            protocol = HTTP1;
-        } else if (strcmp(argv[3],"https") == 0) {
-            protocol = HTTPS;
-        } else if (strcmp(argv[3],"phttpget") == 0) {
-            protocol = PHTTPGET;
+    if (strcmp(argv[3], "http2") == 0) {
+        protocol = HTTP2;
+    } else if (strcmp(argv[3],"http") == 0) {
+        protocol = HTTP1;
+    } else if (strcmp(argv[3],"https") == 0) {
+        protocol = HTTPS;
+    } else if (strcmp(argv[3],"phttpget") == 0) {
+        protocol = PHTTPGET;
 
-            TAILQ_INIT(&phttpget_requests_pending);
 
-            pthread_create(&phttpget_program_thread, NULL, phttpget_start_programm, NULL);
-            pthread_detach(phttpget_program_thread);
+        TAILQ_INIT(&phttpget_requests_pending);
 
-            /* create pipes for phttpget */
-            mkfifo(fifo_out_name, 0666);
-            mkfifo(fifo_in_name, 0666);
-            fifo_out_fd = open(fifo_out_name, O_WRONLY);
-            fifo_in_fd = open(fifo_in_name, O_RDONLY);
+        pthread_create(&phttpget_program_thread, NULL, phttpget_start_programm, NULL);
+        pthread_detach(phttpget_program_thread);
 
-            /* start receiver thread */
-            pthread_create(&phttpget_recv_thread, NULL, phttpget_recv_handler, NULL);
-            pthread_detach(phttpget_recv_thread);
-        } else {
-            fprintf(stderr, "Protocol not supported\n");
-            exit(EXIT_FAILURE);
-        }
+        /* create pipes for phttpget */
+        mkfifo(fifo_out_name, 0666);
+        mkfifo(fifo_in_name, 0666);
+        fifo_out_fd = open(fifo_out_name, O_WRONLY);
+        fifo_in_fd = open(fifo_in_name, O_RDONLY);
+
+        /* start receiver thread */
+        pthread_create(&phttpget_recv_thread, NULL, phttpget_recv_handler, NULL);
+        pthread_detach(phttpget_recv_thread);
     }
 
-    /* User defined max parallel conn */
-    if (argc > 4){
-        max_con = strtol(argv[4], NULL, 10);
-        if (max_con < 1){
-            fprintf(stderr, "Invalid number of connections\n");
-            exit(EXIT_FAILURE);
-        }
-        worker_status = malloc(max_con * sizeof(worker_status[0]));
-        for (int i=0; i<max_con; i++){
-            worker_status[i]=0;
-        }
-    } else {
-        max_con = 6;
-        worker_status = malloc(max_con * sizeof(worker_status[0]));
-        for (int i=0;i<max_con;i++){
-            worker_status[i]=0;
-        }
+    max_con = strtol(argv[4], NULL, 10);
+    if (max_con < 1){
+        fprintf(stderr, "Invalid number of connections\n");
+        exit(EXIT_FAILURE);
+    }
+    worker_status = malloc(max_con * sizeof(worker_status[0]));
+    for (int i=0; i<max_con; i++){
+        worker_status[i]=0;
     }
 
     /* User defined cookie size */
-    if (argc > 5) {
-        cookie_size = strtol(argv[5], NULL, 10);
-    }
+    cookie_size = strtol(argv[5], NULL, 10);
 
     /* Prepare cookie */
     if ((cookie_string = malloc(sizeof(char) * cookie_size)) == NULL) {
@@ -1511,7 +1497,10 @@ int main (int argc, char * argv[]) {
         }
     }
 
-    //cJSON_AddStringToObject(json_for_output,"Protocol",argv[3]);
+    cJSON_AddStringToObject(json_for_output,"Protocol",argv[3]);
+    cJSON_AddNumberToObject(json_for_output,"Max connects",max_con);
+    cJSON_AddNumberToObject(json_for_output,"RTTs",strtol(argv[6], NULL, 10));
+    cJSON_AddNumberToObject(json_for_output,"PLRs",strtod(argv[7],&end));
     cJSON_AddItemToObject(json_for_output,"OLT",download_size);
 
     dofile(testfile);
