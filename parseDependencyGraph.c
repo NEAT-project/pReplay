@@ -231,8 +231,9 @@ run_worker(void *arg)
             snprintf(url, sizeof(url), "%s%s%s", "https://", server, cJSON_GetObjectItem(this_obj, "path")->valuestring);
         }
 
-        pthread_mutex_lock(&lock);
+
         while (1) {
+            pthread_mutex_lock(&lock);
             for (i = 0; i < max_con; i++) {
                 if (worker_status[i] == 0){
                     idle_worker_found = 1;
@@ -240,11 +241,12 @@ run_worker(void *arg)
                     break;
                 }
             }
+            pthread_mutex_unlock(&lock);
             if (idle_worker_found == 1) {
                 break;
             }
         }
-        pthread_mutex_unlock(&lock);
+
 
         if ((res = curl_easy_setopt(easyh1[i], CURLOPT_WRITEFUNCTION, memory_callback)) != CURLE_OK) {
             fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
@@ -1093,7 +1095,7 @@ createActivity(char *job_id)
             cJSON_AddNumberToObject(map_start, cJSON_GetObjectItem(obj_name, "id")->valuestring,1);
         }
         pthread_mutex_unlock(&lock);
-        
+
         // Check whether should trigger dependent activities when 'time' != -1
         if (cJSON_HasObjectItem(obj_name, "triggers")) {
             cJSON *triggers = cJSON_GetObjectItem(obj_name, "triggers");
