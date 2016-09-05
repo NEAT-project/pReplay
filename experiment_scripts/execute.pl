@@ -1,13 +1,9 @@
 #!/usr/bin/perl
 
-
-
 $server="10.0.4.1";   
 $client="10.0.3.1";
 $rctrl="root\@192.168.1.114";
 $sctrl="root\@192.168.1.141";
-
-
 
 # --- Transport layer initialization ---
 # These values are the default TCP
@@ -82,7 +78,10 @@ system ("ssh $sctrl sudo killall tcpdump");
 
 # Add experimental routes
 
+# Ethernet interface
 
+$server_interface="eth1";
+$client_interface="enp2s0";
 # --- Experiment parameters ---
 
 # Emulated bandwidth (down and up)
@@ -176,7 +175,7 @@ while ($tcidx < @bwdown) {
 	  			close (FDR);    
 
 				# Log traffic at server, pause, and ping a little :)
- 	  			system("ssh -f $sctrl sudo tcpdump -n -i eth1 -s 0 -U -w /tmp/temp.pcap  src host 10.0.3.1 or dst host 10.0.3.1 &");
+ 	  			system("ssh -f $sctrl sudo tcpdump -n -i $server_interface -s 0 -U -w /tmp/temp.pcap  src host 10.0.3.1 or dst host 10.0.3.1 &");
 	#			system("sleep 5");
 		#		system("ping -c 10 $server");
 		#		system("ssh $sctrl ping -c 10 $client");
@@ -187,7 +186,7 @@ while ($tcidx < @bwdown) {
                                 $outfilname="/root/test_log/".'results_rtt.'.$rtt.'_plr.'.$plr.'_cookie_sz'.$cookie_size.'_no_coonects'.$no_connects.'_site:'.$array.'_';
 
 
-				system("sudo tcpdump -n -i enp2s0 -U -s 0 -w /tmp/temp.pcap  src host 10.0.3.1 or dst host 10.0.3.1 &");
+				system("sudo tcpdump -n -i $client_interface -U -s 0 -w /tmp/temp.pcap  src host 10.0.3.1 or dst host 10.0.3.1 &");
 				system("sleep 1");
 
 				system("./pReplay $server tree_folder/$array http $no_connects  $cookie_size > $outfilname");
