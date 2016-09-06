@@ -73,7 +73,7 @@ void createActivity(char *job_id);
 int cJSON_HasArrayItem(cJSON *array, const char *string);
 void onComplete(cJSON *obj_name);
 
-int debug = 1;
+int debug = 0;
 double page_load_time = 0.0;
 unsigned long page_size = 0;
 int json_output = 0;
@@ -364,7 +364,8 @@ phttpget_start_programm() {
     int phttpget_status = 0;
 
     /* try to run phttpget in background */
-    snprintf(phttpget_argument, STRING_BUFFER, "HTTP_PIPE=YES ./phttpget %s", server);
+    snprintf(phttpget_argument, STRING_BUFFER, "HTTP_PIPE=YES ./phttpget %s > phttpget.log 2>&1", server);
+    //snprintf(phttpget_argument, STRING_BUFFER, "HTTP_PIPE=YES ./phttpget %s", server);
     phttpget_status = system(phttpget_argument);
 
     fprintf(stderr, "phttpget terminated .... should not see me! - status : %d\n", phttpget_status);
@@ -383,6 +384,7 @@ phttpget_recv_handler()
     uint8_t found = 0;
     ssize_t len = 0;
     ssize_t len_left = 0;
+    char *bufptr = NULL;
 
     if (debug && !json_output) {
         fprintf(stderr, "[%d][%s] - receiver thread started...\n", __LINE__, __func__);
@@ -391,8 +393,9 @@ phttpget_recv_handler()
     while (1) {
 
         len_left = sizeof(struct sctp_pipe_data);
+        bufptr = (char *) &pipe_data_temp;
         while (len_left > 0) {
-            len = read(fifo_in_fd, &pipe_data_temp + sizeof(struct sctp_pipe_data) - len_left, len_left);
+            len = read(fifo_in_fd, bufptr + sizeof(struct sctp_pipe_data) - len_left, len_left);
 
             if (len == 0 || len == -1) {
                 fprintf(stderr, "[%d][%s] - read failed\n", __LINE__, __func__);
@@ -461,6 +464,7 @@ phttpget_request_url(void *arg)
     cJSON *this_obj = NULL;
     ssize_t len = 0;
     ssize_t len_left = 0;
+    char *bufptr = NULL;
 
     obj_name = arg;
     i = cJSON_HasArrayItem(this_objs_array, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
@@ -505,8 +509,9 @@ phttpget_request_url(void *arg)
 
         /* write request to pipe */
         len_left = sizeof(struct sctp_pipe_data);
+        bufptr = (char *) &(request->pipe_data);
         while (len_left > 0) {
-            len = write(fifo_out_fd, &(request->pipe_data) + sizeof(struct sctp_pipe_data) - len_left, len_left);
+            len = write(fifo_out_fd, bufptr + sizeof(struct sctp_pipe_data) - len_left, len_left);
             if (len == -1 || len == 0) {
                 fprintf(stderr, "[%d][%s] - write failed\n", __LINE__, __func__);
                 //exit(EXIT_FAILURE);
