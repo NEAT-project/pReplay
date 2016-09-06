@@ -73,10 +73,11 @@ void createActivity(char *job_id);
 int cJSON_HasArrayItem(cJSON *array, const char *string);
 void onComplete(cJSON *obj_name);
 
-int debug = 0;
+int debug = 1;
+int total_download_request_from_input=0;
 double page_load_time = 0.0;
 unsigned long page_size = 0;
-int json_output = 0;
+int json_output = 1;
 int object_count = 0;
 int first_object = 0;
 char *cookie_string;
@@ -88,6 +89,9 @@ cJSON *this_objs_array = NULL;
 cJSON *this_acts_array = NULL;
 cJSON *map_start = NULL;
 cJSON *map_complete = NULL;
+cJSON *json_for_output=NULL;
+cJSON *download_size=NULL;
+cJSON *temp_download_size=NULL;
 struct timeval start;
 pthread_mutex_t lock;
 void *curl_hnd[NUM_HANDLES];
@@ -227,8 +231,9 @@ run_worker(void *arg)
             snprintf(url, sizeof(url), "%s%s%s", "https://", server, cJSON_GetObjectItem(this_obj, "path")->valuestring);
         }
 
-        pthread_mutex_lock(&lock);
+
         while (1) {
+            pthread_mutex_lock(&lock);
             for (i = 0; i < max_con; i++) {
                 if (worker_status[i] == 0){
                     idle_worker_found = 1;
@@ -236,11 +241,12 @@ run_worker(void *arg)
                     break;
                 }
             }
+            pthread_mutex_unlock(&lock);
             if (idle_worker_found == 1) {
                 break;
             }
         }
-        pthread_mutex_unlock(&lock);
+
 
         if ((res = curl_easy_setopt(easyh1[i], CURLOPT_WRITEFUNCTION, memory_callback)) != CURLE_OK) {
             fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
@@ -294,10 +300,16 @@ run_worker(void *arg)
         object_count++;
         if (json_output == 1) {
             if (first_object == 0) {
-                printf("{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
+                //printf("{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
+                cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
+                cJSON_AddNumberToObject(temp_download_size,"S",total_bytes);
+                cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
                 first_object = 1;
             } else {
-                printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
+                cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
+                cJSON_AddNumberToObject(temp_download_size,"S",total_bytes);
+                cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
+               // printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
             }
         }
         pthread_mutex_unlock(&lock);
@@ -386,7 +398,7 @@ phttpget_recv_handler()
     ssize_t len_left = 0;
     char *bufptr = NULL;
 
-    if (debug && !json_output) {
+    if (debug) {
         fprintf(stderr, "[%d][%s] - receiver thread started...\n", __LINE__, __func__);
     }
 
@@ -435,7 +447,7 @@ phttpget_recv_handler()
         pthread_mutex_unlock(&(request->recv_mutex));
     }
 
-    if (debug && !json_output) {
+    if (debug) {
         fprintf(stderr, "[%d][%s] - read failed - read retured %d (%s)\n", __LINE__, __func__, errno, strerror(errno));
     }
 
@@ -563,16 +575,20 @@ phttpget_request_url(void *arg)
         object_count++;
 
         if (json_output == 1) {
-            if (first_object==0){
-                printf("{\"S\":%ld,\"T\":%f}", total_bytes, transfer_time);
+            if (first_object == 0) {
+                cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
+                cJSON_AddNumberToObject(temp_download_size,"S",total_bytes);
+                cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
                 first_object = 1;
             } else {
-                printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
+                cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
+                cJSON_AddNumberToObject(temp_download_size,"S",total_bytes);
+                cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
             }
         }
 
-        if (debug && !json_output) {
-            printf("[%f] Object_size: %u, transfer_time: %f\n", end_time, request->pipe_data.size_payload + request->pipe_data.size_header, transfer_time);
+        if (debug) {
+            fprintf(stderr,"[%f] Object_size: %u, transfer_time: %f\n", end_time, request->pipe_data.size_payload + request->pipe_data.size_header, transfer_time);
         }
 
         free(request);
@@ -587,7 +603,7 @@ phttpget_request_url(void *arg)
         pthread_mutex_unlock(&thread_count_mutex);
 
     } else {
-        if (debug && !json_output) {
+        if (debug) {
             fprintf(stderr, "[%d][%s] - object not found - fix file!!!...\n", __LINE__, __func__);
             exit(EXIT_FAILURE);
         }
@@ -626,8 +642,8 @@ request_url(void *arg)
 
         gettimeofday(&te, NULL);
         end_time = ((te.tv_sec - start.tv_sec) * 1000 + (double)(te.tv_usec - start.tv_usec) / 1000);
-        if (debug==1 && json_output==0) {
-            printf("[%f] URL: %s\n", end_time, url);
+        if (debug) {
+            fprintf(stderr,"[%f] URL: %s\n", end_time, url);
         }
 
 
@@ -767,15 +783,21 @@ request_url(void *arg)
         pthread_mutex_unlock(&lock);
 
         if (json_output == 1) {
-            if (first_object==0){
-                printf("{\"S\":%ld,\"T\":%f}", total_bytes, transfer_time);
+            if (first_object == 0) {
+                //printf("{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
+                cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
+                cJSON_AddNumberToObject(temp_download_size,"S",total_bytes);
+                cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
                 first_object = 1;
             } else {
-                printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
+                cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
+                cJSON_AddNumberToObject(temp_download_size,"S",total_bytes);
+                cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
+               // printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
             }
         }
-        if (debug==1 && json_output==0) {
-            printf("[%f] Object_size: %ld, transfer_time: %f\n", end_time, (long)bytes+header_bytes, transfer_time);
+        if (debug) {
+            fprintf(stderr,"[%f] Object_size: %ld, transfer_time: %f\n", end_time, (long)bytes+header_bytes, transfer_time);
         }
 
         onComplete(obj_name);
@@ -859,7 +881,7 @@ onComplete(cJSON *obj_name)
     cJSON_AddNumberToObject(obj_name, "ts_e", end_time);
 
     if (debug) {
-        printf("=== [onComplete][%f] {\"id\":%s,\"type\":%s,\"is_started\":%d,\"ts_s\":%f,\"ts_e\":%f}\n",
+        fprintf(stderr,"=== [onComplete][%f] {\"id\":%s,\"type\":%s,\"is_started\":%d,\"ts_s\":%f,\"ts_e\":%f}\n",
             end_time,
             cJSON_GetObjectItem(obj_name,"id")->valuestring,
             cJSON_GetObjectItem(obj_name,"type")->valuestring,
@@ -902,8 +924,8 @@ setTimeout(int ms, char *s)
     struct timespec tim2;
 
     gettimeofday(&ts,NULL);
-    if (debug == 1 && json_output == 0) {
-        printf("Timeout starts (obj id %s): %f ms - sleeping for %d ms\n",
+    if (debug) {
+        fprintf(stderr,"Timeout starts (obj id %s): %f ms - sleeping for %d ms\n",
             s,
             ((ts.tv_sec - start.tv_sec) * 1000 + (double)(ts.tv_usec - start.tv_usec) / 1000),
             ms
@@ -915,8 +937,8 @@ setTimeout(int ms, char *s)
     nanosleep(&tim, &tim2);
 
     gettimeofday(&te, NULL);
-    if (debug == 1 && json_output == 0) {
-        printf("Timeout ends (obj id %s): %f ms \n",
+    if (debug) {
+        fprintf(stderr,"Timeout ends (obj id %s): %f ms \n",
             s,
             ((te.tv_sec - start.tv_sec) * 1000 + (double)(te.tv_usec - start.tv_usec) / 1000)
         );
@@ -1005,8 +1027,8 @@ createActivity(char *job_id)
             ((ts_s.tv_sec - start.tv_sec) * 1000 + (double)(ts_s.tv_usec - start.tv_usec) / 1000)
         );
 
-        if (debug == 1 && json_output == 0) {
-            printf("Object id: %s, type: %s started at %f ms\n",
+        if (debug) {
+            fprintf(stderr,"Object id: %s, type: %s started at %f ms\n",
                 cJSON_GetObjectItem(obj_name,"obj_id")->valuestring,
                 cJSON_GetObjectItem(obj_name,"type")->valuestring,
                 ((ts_s.tv_sec - start.tv_sec) * 1000 + (double)(ts_s.tv_usec - start.tv_usec) / 1000)
@@ -1073,9 +1095,11 @@ createActivity(char *job_id)
             pthread_detach(tid1);
         }
         // TO DO update task start maps
+        pthread_mutex_lock(&lock);
         if (!cJSON_HasObjectItem(map_start, cJSON_GetObjectItem(obj_name, "id")->valuestring)) {
             cJSON_AddNumberToObject(map_start, cJSON_GetObjectItem(obj_name, "id")->valuestring,1);
         }
+        pthread_mutex_unlock(&lock);
 
         // Check whether should trigger dependent activities when 'time' != -1
         if (cJSON_HasObjectItem(obj_name, "triggers")) {
@@ -1124,11 +1148,28 @@ run()
     }
     pthread_mutex_unlock(&thread_count_mutex);
 
-    printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",
+    if (total_download_request_from_input!=object_count)
+    {
+        fprintf(stderr, "Download error\n");
+        EXIT_FAILURE;
+    }else{
+        cJSON_AddNumberToObject(json_for_output,"num_objects",object_count);
+        cJSON_AddNumberToObject(json_for_output,"PLT",page_load_time);
+        cJSON_AddNumberToObject(json_for_output,"page_size",page_size);
+
+        char *out;
+        out=cJSON_Print(json_for_output);
+        cJSON_Delete(json_for_output);
+        printf("%s\n", out);
+        free(out);
+    }
+
+    /*printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",
         object_count,
         page_load_time,
         page_size
-    );
+    );*/
+
 
 }
 
@@ -1194,6 +1235,9 @@ doit(char *text)
         cJSON_AddStringToObject(temp1, "id",cJSON_GetObjectItem(obj, "id")->valuestring);
         cJSON_AddStringToObject(temp1, "host",cJSON_GetObjectItem(obj, "host")->valuestring);
         cJSON_AddStringToObject(temp1, "path",cJSON_GetObjectItem(obj, "path")->valuestring);
+        if (cJSON_GetObjectItem(obj,"path")->valuestring[0]!='\0'){
+            total_download_request_from_input++;
+        }
         cJSON_AddNumberToObject(temp1, "when_comp_start", cJSON_GetObjectItem(obj, "when_comp_start")->valueint);
         cJSON_AddItemReferenceToObject(temp1, "download",download);
         cJSON_AddItemReferenceToObject(temp1, "comps",comps);
@@ -1327,15 +1371,15 @@ doit(char *text)
             cJSON_AddItemToObject(b1,"triggers", temp_array);
         }
     }
-    if (debug == 1 && json_output == 0) {
-        printf("===[objects]");
+    if (debug) {
+        fprintf(stderr,"===[objects]");
         out = cJSON_Print(this_objs_array);
-        printf("%s\n", out);
+        fprintf(stderr,"%s\n", out);
         free(out);
 
-        printf("===[activities]");
+        fprintf(stderr,"===[activities]");
         out=cJSON_Print(this_acts_array);
-        printf("%s\n", out);
+        fprintf(stderr,"%s\n", out);
         free(out);
     }
 
@@ -1459,14 +1503,21 @@ int main (int argc, char * argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    json_for_output=cJSON_CreateObject();
+    download_size=cJSON_CreateArray();
+
     if (json_output == 1) {
         if (strrchr(testfile, '/') == NULL) {
-            printf("\"url_file\": \"%s\",\"OLT\":[", testfile);
+            cJSON_AddStringToObject(json_for_output,"url",testfile);
+           // printf("\"url_file\": \"%s\",\"OLT\":[", testfile);
         } else {
-            printf("\"url_file\": \"%s\",\"OLT\":[", strrchr(testfile, '/') + 1);
+            cJSON_AddStringToObject(json_for_output,"url",strrchr(testfile,'/')+1);
+            //printf("\"url_file\": \"%s\",\"OLT\":[", strrchr(testfile, '/') + 1);
         }
     }
 
+    //cJSON_AddStringToObject(json_for_output,"Protocol",argv[3]);
+    cJSON_AddItemToObject(json_for_output,"OLT",download_size);
 
     dofile(testfile);
     pthread_mutex_destroy(&lock);
