@@ -1,0 +1,8 @@
+args <- commandArgs(trailingOnly = TRUE)
+library(Hmisc)
+x<-read.table("tmp",header=T)
+title<-paste("CNT:",args[1],"RTT:",args[2],"CSZ:",args[3],sep=" ")
+dat<-data.frame(cond=rep(c("TCP","SCTP"),each=2),xvar=x$x1,yvar=x$x2)
+pdf(args[4],width=6,height=4,paper='special')
+ggplot(dat, aes(x=xvar, y=yvar/1000, color=cond))  +geom_point(size=2)+geom_line()+labs(x="PLR", y="PLT",linetype='custom title',fill="")+ theme(legend.title=element_blank())+ggtitle(title) +  theme(plot.title = element_text(lineheight=.8, face="bold"))
+dev.off()
