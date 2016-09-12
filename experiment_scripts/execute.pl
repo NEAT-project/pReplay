@@ -54,7 +54,7 @@ $sctrl="root\@192.168.1.141";
 # None for these experiments
 
 $replications=1;
-$outfilnamn="/root/test_logs/test_";
+$outfilnamn="/root/test_log/test_";
 
 #$writesyslog=1;
 $log_filnamn=$outfilnamn."log";
@@ -90,19 +90,20 @@ $client_interface="enp2s0";
 @bwup=("0");
 
 # Emulated end-to-end delay
-@delay=(10,40,97);
+#@delay=(10,40,97);
 #@delay=(10,40,97,400);
-#@delay=(10);
-@plr=(0,0.03);
+@delay=(10,40);
+#@plr=(0,0.03);
 #@plr=(0,.015,0.03);
-#@plr=(0);
-@no_connects=(1,6,18);
+@plr=(0);
 #@no_connects=(1,6,18);
-#@no_connects=(1);
-@cookie_size=(0,512,2048);
+#@no_connects=(1,6,18);
+@no_connects=(1);
 #@cookie_size=(0,512,2048);
-#@cookie_size=(0);
-@protocol=("http","phttpget");
+#@cookie_size=(0,512,2048);
+@cookie_size=(0);
+#@protocol=("http","phttpget");
+@protocol=("phttpget");
 
 # Queue size used in network emulator
 $queue=100;
@@ -123,7 +124,7 @@ while( $file=readdir BIN ){
 @array = @array[ 2 .. $#array ];
 
 
-$replications=5;
+$replications=1;
 
 
 # --- Experiment execution ---
@@ -150,8 +151,15 @@ while ($tcidx < @bwdown) {
 			 	  			system("ssh $rctrl ipfw add drop icmp from any to any out icmptypes 4");
 
 							# Create new emulation pipes 
-				  			system("ssh $rctrl ipfw add 3 pipe 200 tcp from $client to $server in");
-				  			system("ssh $rctrl ipfw add 4 pipe 300 tcp from $server to $client in");
+							if($protocol eq "http"){
+								print "Setting TCP pipe\n";
+				  				system("ssh $rctrl ipfw add 3 pipe 200 tcp from $client to $server in");
+				  				system("ssh $rctrl ipfw add 4 pipe 300 tcp from $server to $client in");
+							}else{
+								print "Setting SCTP pipe\n";
+				  				system("ssh $rctrl ipfw add 3 pipe 200 sctp from $client to $server in");
+				  				system("ssh $rctrl ipfw add 4 pipe 300 sctp from $server to $client in");
+							}
 
 							# Configure new emulation settings
 							system("ssh $rctrl ipfw pipe 200 config bw $bwdown[$tcidx] delay $delay queue $queue");
@@ -176,10 +184,10 @@ while ($tcidx < @bwdown) {
 				  			close (FDR);    
 
 							# Log traffic at server, pause, and ping a little :)
-							if($protocol==http){
+							if($protocol eq "http"){
 			 	  				system("ssh -f $sctrl tcpdump -n -i $server_interface -s 0 -U -w /tmp/temp.pcap  src host 10.0.3.1 or dst host 10.0.3.1 &");
 							}else{
-			 	  				system("ssh -f $sctrl tcpdump -n -i $server_interface -s 0 -U -w /tmp/temp.pcap  sctp src host 10.0.3.1 or dst host 10.0.3.1 &");
+			 	  				system("ssh -f $sctrl tcpdump -n -i $server_interface -s 0 -U -w /tmp/temp.pcap  src host 10.0.3.1 or dst host 10.0.3.1 and sctp &");
 							}
 				#			system("sleep 5");
 					#		system("ping -c 10 $server");
@@ -188,18 +196,18 @@ while ($tcidx < @bwdown) {
 
 							# Start logging and execution of experiment at the client
 							$rtt=$delay*2;
-			                                $outfilname="/root/test_log/".'rtt.'.$rtt.'_plr.'.$plr.'_csz.'.$cookie_size.'_nc.'.$no_connects.'_ptl.'.$protocol.'_';
-			                                $haroutfilname="/root/test_log/".'rtt.'.$rtt.'_plr.'.$plr.'_csz.'.$cookie_size.'_nc.'.$no_connects.'_ptl.'.$protocol.'_count.'.$testcount.'.json';
+			                                $outfilname="/root/test_log/".'site.'.$array.'_rtt.'.$rtt.'_plr.'.$plr.'_csz.'.$cookie_size.'_nc.'.$no_connects.'_ptl.'.$protocol.'_';
+			                                $jsonoutfilname="/root/test_log/".'site.'.$array.'_rtt.'.$rtt.'_plr.'.$plr.'_csz.'.$cookie_size.'_nc.'.$no_connects.'_ptl.'.$protocol.'_count.'.$testcount.'.json';
 
 
-							if($protocol==http){
+							if($protocol eq "http"){
 								system("sudo tcpdump -n -i $client_interface -U -s 0 -w /tmp/temp.pcap  src host 10.0.3.1 or dst host 10.0.3.1 &");
 							}else{
-								system("sudo tcpdump -n -i $client_interface -U -s 0 -w /tmp/temp.pcap  sctp src host 10.0.3.1 or dst host 10.0.3.1 &");
+								system("sudo tcpdump -n -i $client_interface -U -s 0 -w /tmp/temp.pcap   src host 10.0.3.1 or dst host 10.0.3.1  and sctp &");
 							}
 							system("sleep 1");
 
-							system("./pReplay $server tree_folder/$array $protocol $no_connects  $cookie_size > $haroutfilname");
+							system("./pReplay $server $dir$array $protocol $no_connects  $cookie_size > $jsonoutfilname");
 							
 							system("sudo killall tcpdump");
 							system("sudo gzip -f /tmp/temp.pcap");
