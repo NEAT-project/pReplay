@@ -2,6 +2,7 @@
 
 
 
+
 if [ ! -d temp_json ]; then
   mkdir -p temp_json;
 fi
@@ -13,12 +14,12 @@ for file in *.json ;
 	SFI=$IFS; IFS='_';
 	set -f;
 	B=($file);
-	rtt=$(echo ${B[0]}|cut -d'.' -f2)
-	plr=$(echo ${B[1]}|cut -d'.' -f2-)
-	csz=$(echo ${B[2]}|cut -d'.' -f2)
-	nc=$(echo ${B[3]}|cut -d'.' -f2)
-	ptl=$(echo ${B[4]}|cut -d'.' -f2)
-	count=$(echo ${B[5]}|cut -d'.' -f2)
+	rtt=$(echo ${B[1]}|cut -d'.' -f2)
+	plr=$(echo ${B[2]}|cut -d'.' -f2-)
+	csz=$(echo ${B[3]}|cut -d'.' -f2)
+	nc=$(echo ${B[4]}|cut -d'.' -f2)
+	ptl=$(echo ${B[5]}|cut -d'.' -f2)
+	count=$(echo ${B[6]}|cut -d'.' -f2)
 	
 	#echo $rtt $plr $csz $nc $ptl $count
 	IFS=$SFI 
