@@ -11,41 +11,40 @@ $sctrl="root\@192.168.1.141";
 #
 # Caching is disabled though
 # 
-#system("sudo sysctl -w net.ipv4.tcp_no_metrics_save=1");
-#system("ssh $sctrl sudo sysctl -w net.ipv4.tcp_no_metrics_save=1");
-#system("sudo sysctl -w net.ipv4.tcp_reordering=3");
-#system("ssh $sctrl sudo sysctl -w net.ipv4.tcp_reordering=3");
-#system("sudo sysctl -w net.ipv4.tcp_congestion_control=cubic");
-#system("ssh $sctrl sudo sysctl -w net.ipv4.tcp_congestion_control=cubic");
-#system("sudo sysctl -w net.ipv4.tcp_timestamps=1");
-#system("ssh $sctrl sudo sysctl -w net.ipv4.tcp_timestamps=1");
-#system("sudo sysctl -w net.ipv4.tcp_dsack=1");
-#system("ssh $sctrl sudo sysctl -w net.ipv4.tcp_dsack=1");
-#system("sudo sysctl -w net.core.optmem_max=16777216");
-#system("ssh $sctrl sudo sysctl -w net.core.optmem_max=16777216");
-#system("sudo sysctl -w net.core.rmem_default=16777216");
-#system("ssh $sctrl sudo sysctl -w net.core.rmem_default=16777216");
-#system("sudo sysctl -w net.core.rmem_max=16777216");
-#system("ssh $sctrl sudo sysctl -w net.core.rmem_max=16777216");
-#system("sudo sysctl -w net.core.wmem_max=16777216");
-#system("ssh $sctrl sudo sysctl -w net.core.wmem_max=16777216");
-#system("sudo sysctl -w net.core.wmem_default=16777216");
-#system("ssh $sctrl sudo sysctl -w net.core.wmem_default=16777216");
-#system("sudo sysctl -w net.ipv4.tcp_mem='16777216 16777216 16777216'");
-#system("ssh $sctrl sudo sysctl -w net.ipv4.tcp_mem='16777216 16777216 16777216'");
-#system("sudo sysctl -w net.ipv4.tcp_rmem='16777216 16777216 16777216'");
-#system("ssh $sctrl sudo sysctl -w net.ipv4.tcp_rmem='16777216 16777216 16777216'");
-#system("sudo sysctl -w net.ipv4.tcp_wmem='16777216 16777216 16777216'");
-#system("ssh $sctrl sudo sysctl -w net.ipv4.tcp_wmem='16777216 16777216 16777216'");
+system("sudo sysctl -w net.ipv4.tcp_no_metrics_save=1");
+system("ssh $sctrl sysctl net.inet.tcp.hostcache.expire=1");
+system("ssh $sctrl sysctl net.inet.tcp.hostcache.purge=1");
+system("ssh $sctrl  sysctl net.inet.tcp.hostcache.purgenow=1");
+
+system("sudo sysctl -w net.ipv4.tcp_reordering=3");
+# default is 3 in FreeBSD goo.gl/Xvvvvc
+
+system("sudo sysctl -w net.ipv4.tcp_congestion_control=reno");
+system("ssh $sctrl  sysctl net.inet.tcp.cc.algorithm=newreno");
+
+system("sudo sysctl -w net.ipv4.tcp_timestamps=1");
+system("sudo sysctl -w net.core.optmem_max=16777216");
+system("sudo sysctl -w net.core.rmem_default=16777216");
+system("sudo sysctl -w net.core.rmem_max=16777216");
+system("sudo sysctl -w net.core.wmem_max=16777216");
+system("sudo sysctl -w net.core.wmem_default=16777216");
+system("sudo sysctl -w net.ipv4.tcp_mem='16777216 16777216 16777216'");
+system("sudo sysctl -w net.ipv4.tcp_rmem='16777216 16777216 16777216'");
+system("sudo sysctl -w net.ipv4.tcp_wmem='16777216 16777216 16777216'");
+
+system("ssh $sctrl sysctl net.inet.tcp.rfc1323=1");
+system("ssh $sctrl sysctl net.inet.tcp.sendspace=233016");
+
+system("ssh $sctrl sysctl net.inet.tcp.recvspace=233016");
+
+system("ssh $sctrl sysctl net.inet.tcp.recvbuf_auto=1");
 
 #Disable SS after idle
-#system("sudo sysctl -w net.ipv4.tcp_slow_start_after_idle=0");
-#system("ssh $sctrl sudo sysctl -w net.ipv4.tcp_slow_start_after_idle=0");
-
+system("sudo sysctl -w net.ipv4.tcp_slow_start_after_idle=0");
 
 # Disable offloading to get sensible dumps
-#system("sudo ethtool -K enp2s0 gso off tso off gro off lro off");
-#system("ssh $sctrl sudo ethtool -K eth1 gso off tso off gro off lro off");
+system("sudo ethtool -K enp2s0 gso off tso off gro off lro off");
+system("ssh $sctrl sysctl net.inet.tcp.tso=0");
 
 
 # --- Experimental framework initialization ---
@@ -91,19 +90,19 @@ $client_interface="enp2s0";
 
 # Emulated end-to-end delay
 #@delay=(10,40,97);
-#@delay=(10,40,97,400);
-@delay=(10,40);
+@delay=(10,40,97,400);
+#@delay=(40,97);
 #@plr=(0,0.03);
-#@plr=(0,.015,0.03);
-@plr=(0);
+@plr=(0,.015,0.03);
+#@plr=(0.03);
 #@no_connects=(1,6,18);
-#@no_connects=(1,6,18);
-@no_connects=(1);
+@no_connects=(1,6,18);
+#@no_connects=(1);
 #@cookie_size=(0,512,2048);
-#@cookie_size=(0,512,2048);
-@cookie_size=(0);
+@cookie_size=(0,512,2048);
+#@cookie_size=(0);
 #@protocol=("http","phttpget");
-@protocol=("phttpget");
+@protocol=("http");
 
 # Queue size used in network emulator
 $queue=100;
@@ -124,7 +123,7 @@ while( $file=readdir BIN ){
 @array = @array[ 2 .. $#array ];
 
 
-$replications=1;
+$replications=5;
 
 
 # --- Experiment execution ---
