@@ -1,0 +1,28 @@
+
+\ProvidesPackage{beamerouterthemecsdv}
+
+\mode<presentation>
+
+\defbeamertemplate*{footline}{csdv}
+{
+  \hbox{%
+    \begin{beamercolorbox}[wd=0.6\paperwidth,ht=1.18cm,dp=0.32cm,left,leftskip=2ex]{page number
+        in head/foot}%
+      \vbox{{\usebeamerfont{page number in head/foot}\insertframenumber{}}
+        \hspace*{0.6cm} \usebeamerfont{footline} \insertshortdate{} $\mid$
+        \insertauthor{}}%
+      \vspace*{3mm}
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=0.4\paperwidth,ht=1.18cm,dp=0.32cm,right,rightskip=3mm]{logo}%
+      \includegraphics[width=4cm]{ComputerScience_Logo_Ligg_PMS_Neg.eps}
+    \end{beamercolorbox}
+    }%
+}
+
+\defbeamertemplate*{navigation symbols}{csdv}{}
+\defbeamertemplate*{logo}{csdv}{}
+
+\setbeamersize{text margin left=1.1cm,text margin right=1.05cm}
+
+\mode
+<all>

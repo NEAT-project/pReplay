@@ -1,0 +1,70 @@
+% Copyright 2007 by Till Tantau
+%
+% This file may be distributed and/or modified
+%
+% 1. under the LaTeX Project Public License and/or
+% 2. under the GNU Public License.
+%
+% See the file doc/licenses/LICENSE for more details.
+
+\ProvidesPackage{beamercolorthemecsdv}
+
+
+\mode<presentation>
+
+
+\setbeamertemplate{background}{
+  \ifnum\c@page=1%
+    \includegraphics[width=\paperwidth]{CS_PP-pres_Grunder_15-06_Titelsida.jpg}
+    \else
+    \tikz[overlay, remember picture]
+    \node[at=(current page.south east), anchor=south east, inner sep=0pt]{
+    \includegraphics[width=\paperwidth]{CS_PP-pres_Grunder_15-06_header.jpg}};
+\  \fi}%
+
+%============= KAU colors =============
+\definecolor{KAUyellow}{cmyk}{0,0.16,1.00,0}
+\definecolor{KAUblack}{cmyk}{0,0,0,1.00}
+\definecolor{KAUwhite}{cmyk}{0,0,0,0}
+\definecolor{KAUlightGray}{cmyk}{0,0,0,0.2}
+\definecolor{KAUdarkGray}{cmyk}{0,0,0.2,0.61}
+\definecolor{KAUbrown}{cmyk}{0,0.15,0.5,0.2}
+\definecolor{KAUdarkRed}{cmyk}{0,51.0,1.0,0}
+\definecolor{KAUlightRed}{cmyk}{0, 0.97,0.61,0}
+\definecolor{KAUorange}{cmyk}{0,0.86,0.80,0}
+\definecolor{KAUlightGreen}{cmyk}{0.4,0.2,1.0,0}
+\definecolor{KAUdarkGreen}{cmyk}{0.6,0.2,1.0,0}
+\definecolor{KAUdarkBlue}{cmyk}{1.0,0,0.3,0.25}
+\definecolor{KAUmediumBlue}{cmyk}{0.63,0.22,0,0.03}
+\definecolor{CSDVGreen}{rgb}{0,0.53,0.49}
+
+% COLORS
+%\setbeamercolor*{lower separation line head}{bg=KAUyellow}
+\setbeamercolor*{normal text}{fg=KAUblack,bg=white}
+\setbeamercolor*{alerted text}{fg=KAUlightRed}
+\setbeamercolor*{example text}{fg=KAUblack}
+\setbeamercolor*{structure}{fg=KAUblack}
+\setbeamercolor*{palette tertiary}{fg=KAUwhite,bg=KAUblack}
+%\setbeamercolor*{palette quaternary}{fg=KAUwhite,bg=KAUblack}
+
+\setbeamercolor*{footline}{fg=white}
+
+% Blocks
+\setbeamercolor*{block title}{bg=CSDVGreen, fg=KAUwhite}
+\setbeamercolor*{block body}{bg=KAUlightGray}
+\setbeamercolor*{block title example}{bg=CSDVGreen, fg=KAUwhite}
+\setbeamercolor*{block body example}{bg=KAUlightGray}
+
+% Lists
+\setbeamercolor*{item}{fg=CSDVGreen}
+\setbeamercolor*{item projected}{fg=KAUblack, bg=KAUlightGray}
+
+\setbeamercolor*{title}{fg=white}
+\setbeamercolor*{author}{fg=white}
+\setbeamercolor*{authoremail}{fg=white}
+\setbeamercolor*{institute}{fg=white}
+\setbeamercolor*{date}{fg=white}
+
+
+\mode
+<all>

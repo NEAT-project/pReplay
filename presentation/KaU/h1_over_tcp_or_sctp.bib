@@ -1,0 +1,109 @@
+@inproceedings {how_speedy_is_spdy,
+author = {Xiao Sophia Wang and Aruna Balasubramanian and Arvind Krishnamurthy and David Wetherall},
+title = {How Speedy is SPDY?},
+booktitle = {11th USENIX Symposium on Networked Systems Design and Implementation (NSDI 14)},
+year = {2014},
+month = Apr,
+isbn = {978-1-931971-09-6},
+address = {Seattle, WA},
+pages = {387--399},
+url = {https://www.usenix.org/conference/nsdi14/technical-sessions/wang},
+publisher = {USENIX Association},
+}
+
+@misc{alexa,
+	title={Alexa -- {The Web Information Company}},
+	howpublished={\url{http://alexa.com/topsites/countries/US}}
+}
+
+@misc{libcurl,
+title={Libcurl - client-side {URL} transfers},
+howpublished={\url{https://curl.haxx.se/libcurl/c/libcurl.html}},
+note = {Accessed: 2016-06-15}
+}
+
+@misc{thttpd,
+title = {thttpd - tiny/turbo/throttling {HTTP} server},
+howpublished={\url{http://acme.com/software/thttpd/}},
+}
+
+@misc{thttpdpatch,
+title = {A version of thttpd with {SCTP} support},
+howpublished={\url{https://github.com/rsecchi/thttpd}},
+}
+
+@misc{rfc2616,
+  author="R. Fielding and J. Gettys and J. Mogul and H. Frystyk and L. Masinter and P. Leach and T. Berners-Lee",
+  title="{Hypertext Transfer Protocol -- HTTP/1.1}",
+  series="Request for Comments",
+  number="2616",
+  howpublished="RFC 2616 (Draft Standard)",
+  publisher="IETF",
+  organization="Internet Engineering Task Force",
+  year=1999,
+  month=jun,
+    note="Obsoleted by RFCs 7230, 7231, 7232, 7233, 7234, 7235, updated by RFCs 2817, 5785, 6266, 6585",
+  url="http://www.ietf.org/rfc/rfc2616.txt",
+}
+
+@INPROCEEDINGS { Natarajan06,
+AUTHOR = { Natarajan, P. and Iyengar, J. and Amer, P. and Stewart, R. },
+TITLE = "{SCTP: An Innovative Transport Layer Protocol for the Web}",
+BOOKTITLE = "{The 15th International World Wide Web Conference (WWW 2006)}",
+YEAR = { 2006 },
+PAGES = { 615-624 },
+MONTH = { May },
+ANNOTE = { Abstract: We propose using the Stream Control Transmission Protocol (SCTP), a recent IETF transport layer protocol, for reliable web transport. Although TCP has traditionally been used, we argue that SCTP better matches the needs of HTTP-based network applications. This position paper discusses SCTP features that address: (i) head-of-line blocking within a single TCP connection, (ii) vulnerability to network failures, and (iii) vulnerability to denial-of-service SYN attacks. We discuss our experience in modifying the Apache server and the Firefox browser to benefit from SCTP, and demonstrate our HTTP over SCTP design via simple experiments. We also discuss the benefits of using SCTP in other web domains through two example scenarios - multiplexing user requests, and multiplexing resource access. Finally, we highlight several SCTP features that will be valuable to the design and implementation of current HTTP-based client-server applications. },
+DIM1 = { MULTISTREAMING },
+DIM2 = { WEB },
+DIM3 = { BEST-EFFORT },
+DIM4 = { LIVE },
+DIM5 = { UNKNOWN },
+URL = { papers/Natarajan06-SCTPfortheWeb.pdf },
+}
+
+
+
+@INPROCEEDINGS { Natarajan08,
+AUTHOR = { Natarajan, P. and Amer, P. and Stewart, R. },
+TITLE = "{Multistreamed Web Transport for Developing Regions}",
+BOOKTITLE = "{The ACM SIGCOMM 2008 Conference on Computer Communications - 2nd ACM SIGCOMM Workshop on Networked Systems for Developing Regions, (NSDR'08)}",
+YEAR = { 2008 },
+PAGES = { 43-48 },
+ADDRESS = { Seattle, WA, United states },
+MONTH = { August },
+ANNOTE = { Abstract: A multistreamed web transport has the potential to reduce head-of-line (HOL) blocking, and improve response times in high latency Internet browsing environments, typical of developing regions. In our position paper [13], we proposed a design for HTTP over the multistreamed Stream Control Transmission Protocol (SCTP), and implemented the design for non-pipelined (HTTP 1.0) transactions in the Apache web server and Firefox web browser. We have since adapted Apache and Firefox to handle HTTP 1.1 persistent, pipelined transfers over SCTP streams. Initial emulation results over high latency paths reveal that HTTP over SCTP streams benefits from faster page downloads, and achieves visually perceivable improvements to pipelined objects' response times. Movies comparing page downloads of HTTP/TCP vs. HTTP/SCTP streams can be found on the author's website [12]. The promising results have motivated us to propose a low cost, easily realizable, gateway-based HTTP over SCTP deployment solution to enhance users' browsing experience in developing regions. Copyright 2008 ACM. },
+URL = { http://dx.doi.org/10.1145/1397705.1397717 },
+}
+
+@INPROCEEDINGS { Natarajan09,
+AUTHOR = {Natarajan, P. and Baker, F. and Amer, P.},
+TITLE = "{Multiple TCP connections Improve HTTP throughput - Myth or Fact?}",
+YEAR = { 2009 },
+PAGES = { 41 - 48 },
+ADDRESS = { Scottsdale, AZ, United states },
+ABSTRACT = { Prior research showed that transmitting independent HTTP transactions using a single TCP bytestream is inefficient and worsens a user's perceived web performance [8]. A widely deployed alternative is to download HTTP transactions over parallel TCP connections. While the aggregate sending rate of multiple TCPs is expected to improve HTTP throughput, emulation results show otherwise. Our studies show that HTTP performance over multiple TCPs depends on several factors, and web users/browsers, especially those in the developing world and other areas with similar browsing conditions, are more likely to experience worsened HTTP throughput. An alternate solution to improve user-perceived web performance is to download HTTP transactions over a multistreamed transport such as SCTP [16]. In this work, we compare HTTP's performance over a single multistreamed SCTP association vs. multiple TCP connections, and discuss the trade-offs involved in the two transport mechanisms. © 2009 IEEE. },
+COPYRIGHT = { Compilation and indexing terms, Copyright 2010 Elsevier Inc. },
+JOURNAL = "{2009 IEEE 28th International Performance Computing and Communications Conference, IPCCC 2009 }",
+KEY = { HTTP },
+KEYWORDS = { Developing countries;Internet protocols;Transmission control protocol; },
+LANGUAGE = { English },
+URL = { http://dx.doi.org/10.1109/PCCC.2009.5403802 },
+}
+
+@INPROCEEDINGS { Xue09,
+AUTHOR = { Xue, Miao and Jiang, H. and Dong, P. and Qin, Y. and Zhang, S. and Zhang, H. },
+TITLE = "{DSA-SCTP: An Extension of SCTP to Reduce Web Response Time }",
+YEAR = { 2009 },
+PAGES = { 874 - 879 },
+ADDRESS = { Beijing, China },
+ABSTRACT = { SCTP multi-streaming provides an aggregation mechanism to multiplex logically separate message streams to the same association. While the current SCTP creates streams only at the initial association establishment phase and afterwards the streams are not allowed to modify. When transmitting web objects concurrently with multi-streaming, it causes unnecessary waiting, as a result of large objects occupying the streams while small ones having no streams allocated. In this paper, we proposed an extension to the standard SCTP to support dynamic stream addition during the communication. We implement Dynamic Stream Addition SCTP (DSA-SCTP) to the web application to reduce the response time of the web server. The performance evaluation of DSA-SCTP for the web is studied through ns-2. The results show that the proposed DSA-SCTP brings a remarkable improvement to the web server's response time. The results also indicate that DSA-SCTP can be implemented to the similar applications as web to improve their performance. ©2009 IEEE. },
+COPYRIGHT = { Compilation and indexing terms, Copyright 2010 Elsevier Inc. },
+JOURNAL = "{Proceedings of 2009 IEEE International Conference on Communications Technology and Applications, IEEE ICCTA2009}",
+KEY = { Internet protocols },
+KEYWORDS = { Analog differential analyzers;Dynamic response;Hydraulics;Web services; },
+LANGUAGE = { English },
+URL = { http://dx.doi.org/10.1109/ICCOMTA.2009.5349075 },
+}
+
+

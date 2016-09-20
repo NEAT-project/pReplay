@@ -1,0 +1,394 @@
+% Copyright 2007 by Till Tantau
+%
+% This file may be distributed and/or modified
+%
+% 1. under the LaTeX Project Public License and/or
+% 2. under the GNU Public License.
+%
+% See the file doc/licenses/LICENSE for more details.
+
+\ProvidesPackage{beamerinnerthemecsdv}
+
+
+\mode<presentation>
+
+% Some images:
+
+\pgfdeclareimage[width=14pt,height=12pt]{beamericonbook}{beamericonbook}
+\pgfdeclareimage[width=14pt,height=12pt]{beamericonbookshaded}{beamericonbook.20}
+\pgfaliasimage{beamericonbook.!20opaque}{beamericonbookshaded}
+\pgfaliasimage{beamericonbook.!15opaque}{beamericonbookshaded}
+\pgfaliasimage{beamericonbook.!10opaque}{beamericonbookshaded}
+\pgfaliasimage{beamericonbook.!5opaque}{beamericonbookshaded}
+\pgfaliasimage{beamericonbook.!2opaque}{beamericonbookshaded}
+\pgfdeclareimage[width=11pt,height=14pt]{beamericonarticle}{beamericonarticle}
+\pgfdeclareimage[width=11pt,height=14pt]{beamericonarticleshaded}{beamericonarticle.20}
+\pgfaliasimage{beamericonarticle.!20opaque}{beamericonarticleshaded}
+\pgfaliasimage{beamericonarticle.!15opaque}{beamericonarticleshaded}
+\pgfaliasimage{beamericonarticle.!10opaque}{beamericonarticleshaded}
+\pgfaliasimage{beamericonarticle.!5opaque}{beamericonarticleshaded}
+\pgfaliasimage{beamericonarticle.!2opaque}{beamericonarticleshaded}
+
+
+
+
+% Title page: csdv
+
+\defbeamertemplate*{title page}{csdv}[1][]
+{
+  \vbox{}
+  \vfill
+  \begin{centering}
+    \begin{beamercolorbox}[sep=8pt,center]{title}
+      \usebeamerfont{title}\inserttitle\par%
+      \ifx\insertsubtitle\@empty%
+      \else%
+        \vskip0.25em%
+        {\usebeamerfont{subtitle}\usebeamercolor[fg]{subtitle}\insertsubtitle\par}%
+      \fi%
+    \end{beamercolorbox}%
+%    \vskip1em\par
+    \begin{beamercolorbox}[sep=0pt,center]{author}%
+      \usebeamerfont{author}\insertauthor%
+    \end{beamercolorbox}%
+    \ifx\insertinstitute\@empty%
+    \else%
+      \begin{beamercolorbox}[sep=0pt,center]{institute}%
+        \usebeamerfont{institute}\insertinstitute%
+      \end{beamercolorbox}%
+    \fi%
+    \ifx\insertauthoremail\@empty%
+    \else%
+      \begin{beamercolorbox}[sep=0pt,center]{authoremail}%
+        \usebeamerfont{authoremail}\insertauthoremail%
+      \end{beamercolorbox}%
+    \fi
+  \end{centering}
+  \vfill
+}
+
+
+% Part page: csdv
+
+\defbeamertemplate*{part page}{csdv}[1][]
+{
+  \begin{centering}
+    {\usebeamerfont{part name}\usebeamercolor[fg]{part name}\partname~\insertromanpartnumber}
+    \vskip1em\par
+    \begin{beamercolorbox}[sep=16pt,center,#1]{part title}
+      \usebeamerfont{part title}\insertpart\par
+    \end{beamercolorbox}
+  \end{centering}
+}
+
+
+% Section page: csdv
+
+\defbeamertemplate*{section page}{csdv}[1][]
+{
+  \begin{centering}
+    {\usebeamerfont{section name}\usebeamercolor[fg]{section name}\sectionname~\insertsectionnumber}
+    \vskip1em\par
+    \begin{beamercolorbox}[sep=12pt,center,#1]{part title}
+      \usebeamerfont{section title}\insertsection\par
+    \end{beamercolorbox}
+  \end{centering}
+}
+
+% Subection page: csdv
+
+\defbeamertemplate*{subsection page}{csdv}[1][]
+{
+  \begin{centering}
+    {\usebeamerfont{subsection name}\usebeamercolor[fg]{subsection name}\subsectionname~\insertsubsectionnumber}
+    \vskip1em\par
+    \begin{beamercolorbox}[sep=8pt,center,#1]{part title}
+      \usebeamerfont{subsection title}\insertsubsection\par
+    \end{beamercolorbox}
+  \end{centering}
+}
+
+
+
+
+%
+% Table of contents
+%
+
+% (sub-)section in toc: csdv
+
+\defbeamertemplate*{section in toc}{csdv}
+{\leavevmode{\scriptsize\raise1.25pt\hbox{\donotcoloroutermaths$\blacktriangleright$\hspace{1mm}}}
+  \usebeamerfont{section in toc}\inserttocsection\par}
+
+\defbeamertemplate*{subsection in toc}{csdv}
+{\leavevmode\leftskip=1.5em\inserttocsubsection\par}
+
+\defbeamertemplate*{subsubsection in toc}{csdv}
+{\leavevmode\normalsize\usebeamerfont{subsection in toc}\leftskip=3em%
+  \usebeamerfont{subsubsection in toc}\inserttocsubsubsection\par}
+
+
+% (sub-)section in toc shaded, csdv
+
+\defbeamertemplate*{section in toc shaded}{csdv}[1][20]
+{\begin{colormixin}{#1!parent.bg}\usebeamertemplate{section in toc}\end{colormixin}\unskip}
+
+\defbeamertemplate*{subsection in toc shaded}{csdv}[1][20]
+{\begin{colormixin}{#1!parent.bg}\usebeamertemplate{subsection in toc}\end{colormixin}\unskip}
+
+\defbeamertemplate*{subsubsection in toc shaded}{csdv}[1][20]
+{\begin{colormixin}{#1!parent.bg}\usebeamertemplate{subsubsection in toc}\end{colormixin}\unskip}
+
+
+
+
+
+%
+% Item
+%
+
+% Itemize items, csdv
+
+\defbeamertemplate*{itemize item}{csdv}{\scriptsize\raise1.25pt\hbox{\donotcoloroutermaths$\blacktriangleright$}}
+\defbeamertemplate*{itemize subitem}{csdv}{\tiny\raise1.5pt\hbox{\donotcoloroutermaths$\blacktriangleright$}}
+\defbeamertemplate*{itemize subsubitem}{csdv}{\tiny\raise1.5pt\hbox{\donotcoloroutermaths$\blacktriangleright$}}
+
+
+% Enumerate items, csdv
+
+\defbeamertemplate*{enumerate item}{csdv}{\insertenumlabel.}
+\defbeamertemplate*{enumerate subitem}{csdv}{\insertenumlabel.\insertsubenumlabel}
+\defbeamertemplate*{enumerate subsubitem}{csdv}{\insertenumlabel.\insertsubenumlabel.\insertsubsubenumlabel}
+\defbeamertemplate*{enumerate mini template}{csdv}{\insertenumlabel}
+
+
+% Description item width
+
+\defbeamertemplate*{description item}{csdv}{\insertdescriptionitem}
+
+
+
+% Itemize/Enumerate body
+
+\defbeamertemplate*{itemize/enumerate body begin}{csdv}{}
+\defbeamertemplate*{itemize/enumerate body end}{csdv}{}
+
+\defbeamertemplate*{itemize/enumerate subbody begin}{csdv}{}
+\defbeamertemplate*{itemize/enumerate subbody end}{csdv}{}
+
+\defbeamertemplate*{itemize/enumerate subsubbody begin}{csdv}{}
+\defbeamertemplate*{itemize/enumerate subsubbody end}{csdv}{}
+
+
+
+% Alerted text
+
+\defbeamertemplate*{alerted text begin}{csdv}{\setbeamercolor{local structure}{parent=alerted text}}
+
+
+
+% Structured text
+
+% empyt csdv
+
+
+% Bibliography items
+
+\defbeamertemplate*{bibliography item}{csdv}
+{\lower3.5pt\hbox{\hskip2pt\pgfuseimage{beamericonarticle}\hskip1pt}}
+
+\defbeamertemplate*{bibliography entry article}{csdv}{}
+\defbeamertemplate*{bibliography entry title}{csdv}{\par}
+\defbeamertemplate*{bibliography entry location}{csdv}{\par}
+\defbeamertemplate*{bibliography entry note}{csdv}{\par}
+
+
+% Buttons
+
+\newdimen\beamer@dima%
+\newdimen\beamer@dimb%
+
+\defbeamertemplate*{button}{csdv}
+{%
+  \setbox\beamer@tempbox=\hbox{{\insertbuttontext}}%
+  \ht\beamer@tempbox=6pt%
+  \dp\beamer@tempbox=0pt%
+  \setbox\beamer@tempbox=\vbox{\box\beamer@tempbox\vskip2pt}%
+  \beamer@tempdim=\wd\beamer@tempbox%
+  \beamer@dima=\beamer@tempdim\advance\beamer@dima by2.2pt
+  \beamer@dimb=\beamer@tempdim\advance\beamer@dimb by4pt
+  \begin{pgfpicture}{-4pt}{0pt}{\the\beamer@tempdim}{8pt}
+    \color{bg}
+    \pgfsetlinewidth{0.8pt}
+    \pgfpathqmoveto{0pt}{0pt}
+    \pgfpathqcurveto{-2.2pt}{0pt}{-4pt}{1.8pt}{-4pt}{4pt}
+    \pgfpathqcurveto{-4pt}{6.2pt}{-2.2pt}{8pt}{0pt}{8pt}
+    \pgfpathlineto{\pgfpoint{\the\beamer@tempdim}{8pt}}
+    \pgfpathcurveto%
+    {\pgfpoint{\the\beamer@dima}{8pt}}%
+    {\pgfpoint{\the\beamer@dimb}{6.2pt}}%
+    {\pgfpoint{\the\beamer@dimb}{4pt}}
+    \pgfpathcurveto%
+    {\pgfpoint{\the\beamer@dimb}{1.8pt}}%
+    {\pgfpoint{\the\beamer@dima}{0pt}}%
+    {\pgfpoint{\the\beamer@tempdim}{0pt}}
+    \pgfpathclose
+    \pgfusepathqfill
+    \colorlet{bg}{parent.bg}
+    \usebeamercolor[fg]{button border}
+    \pgfpathqmoveto{0pt}{0pt}
+    \pgfpathqcurveto{-2.2pt}{0pt}{-4pt}{1.8pt}{-4pt}{4pt}
+    \pgfpathqcurveto{-4pt}{6.2pt}{-2.2pt}{8pt}{0pt}{8pt}
+    \pgfpathlineto{\pgfpoint{\the\beamer@tempdim}{8pt}}
+    \pgfpathcurveto%
+    {\pgfpoint{\the\beamer@dima}{8pt}}%
+    {\pgfpoint{\the\beamer@dimb}{6.2pt}}%
+    {\pgfpoint{\the\beamer@dimb}{4pt}}
+    \pgfpathcurveto%
+    {\pgfpoint{\the\beamer@dimb}{1.8pt}}%
+    {\pgfpoint{\the\beamer@dima}{0pt}}%
+    {\pgfpoint{\the\beamer@tempdim}{0pt}}
+    \pgfpathclose
+    \pgfusepathqstroke
+  \end{pgfpicture}%
+  \hskip-\beamer@tempdim%
+  \box\beamer@tempbox%
+  \kern4pt%
+}
+
+
+% Abstract
+
+\defbeamertemplate*{abstract title}{csdv}
+{%
+  \begin{center}%
+    \abstractname
+  \end{center}%
+}
+
+\defbeamertemplate*{abstract begin}{csdv}
+{\beamercolorbox[vmode]{abstract}\leftskip2em\rightskip2em plus 1fill\usebeamerfont*{abstract}}
+
+\defbeamertemplate*{abstract end}{csdv}
+{\medskip\endbeamercolorbox}
+
+
+% Verse
+
+\defbeamertemplate*{verse begin}{csdv}
+{\beamercolorbox[vmode]{verse}}
+
+\defbeamertemplate*{verse end}{csdv}
+{\endbeamercolorbox}
+
+
+% Quotation
+
+\defbeamertemplate*{quotation begin}{csdv}
+{\beamercolorbox[vmode]{quotation}}
+
+\defbeamertemplate*{quotation end}{csdv}
+{\endbeamercolorbox}
+
+
+% Quote
+
+\defbeamertemplate*{quote begin}{csdv}
+{\beamercolorbox[vmode]{quote}}
+
+\defbeamertemplate*{quote end}{csdv}
+{\endbeamercolorbox}
+
+
+% Footnotes
+
+\defbeamertemplate*{footnote}{csdv}
+{
+  \parindent 1em\noindent%
+  \raggedright
+  \hbox to 7em{\hfil\insertfootnotemark} \insertfootnotetext\par%
+}
+
+
+% Captions
+
+\defbeamertemplate*{caption}{csdv}
+{%
+  \raggedright
+  {%
+    \usebeamercolor[fg]{caption name}%
+    \usebeamerfont*{caption name}%
+    \insertcaptionname:%
+  }
+  \insertcaption\par
+}
+
+
+% Blocks
+
+\defbeamertemplate*{block begin}{csdv}[1][shadow=false]
+{
+  \par\vskip\medskipamount%
+  \begin{beamerboxesrounded}[upper=block title,lower=block body,#1]%
+    {\raggedright\usebeamerfont*{block title}\insertblocktitle}%
+    \raggedright%
+    \usebeamerfont{block body}%
+    \setbeamercolor*{item}{fg=black}
+}
+\defbeamertemplate*{block end}{csdv}[1][]
+{\end{beamerboxesrounded}\vskip\smallskipamount}
+
+\defbeamertemplate*{block alerted begin}{csdv}[1][shadow=false]
+{
+  \par\vskip\medskipamount%
+  \begin{beamerboxesrounded}[upper=block title alerted,lower=block body alerted,#1]%
+    {\raggedright\usebeamerfont*{block title alerted}\insertblocktitle}%
+    \raggedright%
+    \usebeamerfont{block body alerted}%
+}%
+\defbeamertemplate*{block alerted end}{csdv}[1][]
+{\end{beamerboxesrounded}\vskip\smallskipamount}
+
+\defbeamertemplate*{block example begin}{csdv}[1][shadow=false]
+{
+  \par\vskip\medskipamount%
+  \begin{beamerboxesrounded}[upper=block title example,lower=block body example,#1]
+    {\raggedright\usebeamerfont*{block title example}\insertblocktitle}%
+    \raggedright%
+    \usebeamerfont{block body alerted}%
+}%
+\defbeamertemplate*{block example end}{csdv}[1][]
+{\end{beamerboxesrounded}\vskip\smallskipamount}
+
+
+% Theorems
+
+\defbeamertemplate*{theorem begin}{csdv}
+{%
+  \begin{\inserttheoremblockenv}
+  {%
+    \inserttheoremname
+    \ifx\inserttheoremaddition\@empty\else\ (\inserttheoremaddition)\fi%
+  }%
+}
+
+\defbeamertemplate*{theorem end}{csdv}
+{\end{\inserttheoremblockenv}}
+
+
+% Proofs
+\defbeamertemplate*{proof begin}{csdv}
+{\begin{block}{\insertproofname}}
+
+\defbeamertemplate*{proof end}{csdv}
+{\end{block}}
+
+\defbeamertemplate*{qed symbol}{csdv}
+{\openbox}
+
+
+
+
+\mode
+<all>
