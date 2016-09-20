@@ -55,9 +55,10 @@ struct memory_chunk {
 
 struct sctp_pipe_data {
     uint32_t    id;
-    uint32_t    pathlen;
-    uint32_t    size_header;
-    uint32_t    size_payload;
+    uint32_t    path_len;
+    uint32_t    cookie_len;
+    uint32_t    header_len;
+    uint32_t    payload_len;
     char        path[FIFO_BUFFER_SIZE];
 } __attribute__ ((packed));
 
@@ -376,7 +377,8 @@ phttpget_start_programm() {
     int phttpget_status = 0;
 
     /* try to run phttpget in background */
-    snprintf(phttpget_argument, STRING_BUFFER, "HTTP_PIPE=YES ./phttpget %s", server);
+    snprintf(phttpget_argument, STRING_BUFFER, "HTTP_PIPE=YES ./phttpget %s > phttpget.log 2>&1", server);
+    //snprintf(phttpget_argument, STRING_BUFFER, "HTTP_PIPE=YES ./phttpget %s", server);
     phttpget_status = system(phttpget_argument);
 
     fprintf(stderr, "phttpget terminated .... should not see me! - status : %d\n", phttpget_status);
@@ -395,6 +397,7 @@ phttpget_recv_handler()
     uint8_t found = 0;
     ssize_t len = 0;
     ssize_t len_left = 0;
+    char *bufptr = NULL;
 
     if (debug) {
         fprintf(stderr, "[%d][%s] - receiver thread started...\n", __LINE__, __func__);
@@ -403,8 +406,9 @@ phttpget_recv_handler()
     while (1) {
 
         len_left = sizeof(struct sctp_pipe_data);
+        bufptr = (char *) &pipe_data_temp;
         while (len_left > 0) {
-            len = read(fifo_in_fd, &pipe_data_temp + sizeof(struct sctp_pipe_data) - len_left, len_left);
+            len = read(fifo_in_fd, bufptr + sizeof(struct sctp_pipe_data) - len_left, len_left);
 
             if (len == 0 || len == -1) {
                 fprintf(stderr, "[%d][%s] - read failed\n", __LINE__, __func__);
@@ -473,6 +477,7 @@ phttpget_request_url(void *arg)
     cJSON *this_obj = NULL;
     ssize_t len = 0;
     ssize_t len_left = 0;
+    char *bufptr = NULL;
 
     obj_name = arg;
     i = cJSON_HasArrayItem(this_objs_array, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
@@ -495,16 +500,15 @@ phttpget_request_url(void *arg)
 
         /* fill pipe data */
         /* write url to buffer and save length */
-        request->pipe_data.pathlen = snprintf(
+        request->pipe_data.path_len = snprintf(
             request->pipe_data.path,
             FIFO_BUFFER_SIZE,
             "%s",
-            cJSON_GetObjectItem(this_obj,
-            "path")->valuestring
+            cJSON_GetObjectItem(this_obj, "path")->valuestring
         );
 
         /* check pathlen */
-        if (request->pipe_data.pathlen <= 0) {
+        if (request->pipe_data.path_len <= 0) {
             fprintf(stderr, "[%d][%s] - pathlen <= 0\n", __LINE__, __func__);
             exit(EXIT_FAILURE);
         }
@@ -512,13 +516,15 @@ phttpget_request_url(void *arg)
         pthread_mutex_lock(&phttpget_write_mutex);
         phttpget_request_counter++;
         request->pipe_data.id = phttpget_request_counter;
+        request->pipe_data.cookie_len = cookie_size;
         /* enqueue request */
         TAILQ_INSERT_TAIL(&phttpget_requests_pending, request, entries);
 
         /* write request to pipe */
         len_left = sizeof(struct sctp_pipe_data);
+        bufptr = (char *) &(request->pipe_data);
         while (len_left > 0) {
-            len = write(fifo_out_fd, &(request->pipe_data) + sizeof(struct sctp_pipe_data) - len_left, len_left);
+            len = write(fifo_out_fd, bufptr + sizeof(struct sctp_pipe_data) - len_left, len_left);
             if (len == -1 || len == 0) {
                 fprintf(stderr, "[%d][%s] - write failed\n", __LINE__, __func__);
                 //exit(EXIT_FAILURE);
@@ -563,8 +569,8 @@ phttpget_request_url(void *arg)
         pthread_mutex_lock(&lock);
         page_load_time = end_time= ((te.tv_sec - start.tv_sec) * 1000 + (double)(te.tv_usec - start.tv_usec) / 1000);
 
-        total_bytes = request->pipe_data.size_payload + request->pipe_data.size_header;
-        page_size += request->pipe_data.size_payload;
+        total_bytes = request->pipe_data.payload_len + request->pipe_data.header_len;
+        page_size += request->pipe_data.payload_len;
 
         TAILQ_REMOVE(&phttpget_requests_pending, request, entries);
         object_count++;
@@ -583,7 +589,7 @@ phttpget_request_url(void *arg)
         }
 
         if (debug) {
-            fprintf(stderr,"[%f] Object_size: %u, transfer_time: %f\n", end_time, request->pipe_data.size_payload + request->pipe_data.size_header, transfer_time);
+            fprintf(stderr,"[%f] Object_size: %u, transfer_time: %f\n", end_time, request->pipe_data.payload_len + request->pipe_data.header_len, transfer_time);
         }
 
         free(request);
@@ -1470,12 +1476,12 @@ int main (int argc, char * argv[]) {
     cookie_size = strtol(argv[5], NULL, 10);
 
     /* Prepare cookie */
-    if ((cookie_string = malloc(sizeof(char) * cookie_size)) == NULL) {
+    if ((cookie_string = malloc(sizeof(char) * cookie_size + 1)) == NULL) {
         perror("malloc");
     }
 
     memset(cookie_string, 97, cookie_size);
-    cookie_string[cookie_size - 1] = '\0';
+    cookie_string[cookie_size] = '\0';
 
     /* init a multi stack */
     multi_handle = curl_multi_init();
