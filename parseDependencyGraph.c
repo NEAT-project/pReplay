@@ -55,9 +55,10 @@ struct memory_chunk {
 
 struct sctp_pipe_data {
     uint32_t    id;
-    uint32_t    pathlen;
-    uint32_t    size_header;
-    uint32_t    size_payload;
+    uint32_t    path_len;
+    uint32_t    cookie_len;
+    uint32_t    header_len;
+    uint32_t    payload_len;
     char        path[FIFO_BUFFER_SIZE];
 } __attribute__ ((packed));
 
@@ -499,16 +500,15 @@ phttpget_request_url(void *arg)
 
         /* fill pipe data */
         /* write url to buffer and save length */
-        request->pipe_data.pathlen = snprintf(
+        request->pipe_data.path_len = snprintf(
             request->pipe_data.path,
             FIFO_BUFFER_SIZE,
             "%s",
-            cJSON_GetObjectItem(this_obj,
-            "path")->valuestring
+            cJSON_GetObjectItem(this_obj, "path")->valuestring
         );
 
         /* check pathlen */
-        if (request->pipe_data.pathlen <= 0) {
+        if (request->pipe_data.path_len <= 0) {
             fprintf(stderr, "[%d][%s] - pathlen <= 0\n", __LINE__, __func__);
             exit(EXIT_FAILURE);
         }
@@ -516,6 +516,7 @@ phttpget_request_url(void *arg)
         pthread_mutex_lock(&phttpget_write_mutex);
         phttpget_request_counter++;
         request->pipe_data.id = phttpget_request_counter;
+        request->pipe_data.cookie_len = cookie_size;
         /* enqueue request */
         TAILQ_INSERT_TAIL(&phttpget_requests_pending, request, entries);
 
@@ -568,8 +569,8 @@ phttpget_request_url(void *arg)
         pthread_mutex_lock(&lock);
         page_load_time = end_time= ((te.tv_sec - start.tv_sec) * 1000 + (double)(te.tv_usec - start.tv_usec) / 1000);
 
-        total_bytes = request->pipe_data.size_payload + request->pipe_data.size_header;
-        page_size += request->pipe_data.size_payload;
+        total_bytes = request->pipe_data.payload_len + request->pipe_data.header_len;
+        page_size += request->pipe_data.payload_len;
 
         TAILQ_REMOVE(&phttpget_requests_pending, request, entries);
         object_count++;
@@ -588,7 +589,7 @@ phttpget_request_url(void *arg)
         }
 
         if (debug) {
-            fprintf(stderr,"[%f] Object_size: %u, transfer_time: %f\n", end_time, request->pipe_data.size_payload + request->pipe_data.size_header, transfer_time);
+            fprintf(stderr,"[%f] Object_size: %u, transfer_time: %f\n", end_time, request->pipe_data.payload_len + request->pipe_data.header_len, transfer_time);
         }
 
         free(request);
@@ -1489,12 +1490,12 @@ int main (int argc, char * argv[]) {
     }
 
     /* Prepare cookie */
-    if ((cookie_string = malloc(sizeof(char) * cookie_size)) == NULL) {
+    if ((cookie_string = malloc(sizeof(char) * cookie_size + 1)) == NULL) {
         perror("malloc");
     }
 
     memset(cookie_string, 97, cookie_size);
-    cookie_string[cookie_size - 1] = '\0';
+    cookie_string[cookie_size] = '\0';
 
     /* init a multi stack */
     multi_handle = curl_multi_init();
