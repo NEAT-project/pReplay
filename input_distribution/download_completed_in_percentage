@@ -1,0 +1,67 @@
+diff --git a/parseDependencyGraph.c b/parseDependencyGraph.c
+index 2030f8e..b15abf4 100644
+--- a/parseDependencyGraph.c
++++ b/parseDependencyGraph.c
+@@ -74,7 +74,7 @@ void createActivity(char *job_id);
+ int cJSON_HasArrayItem(cJSON *array, const char *string);
+ void onComplete(cJSON *obj_name);
+ 
+-int debug = 1;
++int debug = 0;
+ int total_download_request_from_input=0;
+ double page_load_time = 0.0;
+ unsigned long page_size = 0;
+@@ -301,7 +301,6 @@ run_worker(void *arg)
+         object_count++;
+         if (json_output == 1) {
+             if (first_object == 0) {
+-                //printf("{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
+                 cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
+                 cJSON_AddNumberToObject(temp_download_size,"S",total_bytes);
+                 cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
+@@ -310,7 +309,6 @@ run_worker(void *arg)
+                 cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
+                 cJSON_AddNumberToObject(temp_download_size,"S",total_bytes);
+                 cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
+-               // printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
+             }
+         }
+         pthread_mutex_unlock(&lock);
+@@ -925,7 +923,7 @@ setTimeout(int ms, char *s)
+     struct timespec tim2;
+ 
+     gettimeofday(&ts,NULL);
+-    if (debug) {
++    if (debug ) {
+         fprintf(stderr,"Timeout starts (obj id %s): %f ms - sleeping for %d ms\n",
+             s,
+             ((ts.tv_sec - start.tv_sec) * 1000 + (double)(ts.tv_usec - start.tv_usec) / 1000),
+@@ -1028,11 +1026,17 @@ createActivity(char *job_id)
+             ((ts_s.tv_sec - start.tv_sec) * 1000 + (double)(ts_s.tv_usec - start.tv_usec) / 1000)
+         );
+ 
+-        if (debug) {
++        /*if (debug) {
+             fprintf(stderr,"Object id: %s, type: %s started at %f ms\n",
+                 cJSON_GetObjectItem(obj_name,"obj_id")->valuestring,
+                 cJSON_GetObjectItem(obj_name,"type")->valuestring,
+-                ((ts_s.tv_sec - start.tv_sec) * 1000 + (double)(ts_s.tv_usec - start.tv_usec) / 1000)
++                ((ts_s.tv_sec - start.tv_sec) * 1000 + (double)(ts_s.tv_usec - start.tv_usec) / 1000),
++            );*/
++        if (debug||1) {
++            fprintf(stderr,"%f ms -  %s,  %f%%  done!\n",
++                ((ts_s.tv_sec - start.tv_sec) * 1000 + (double)(ts_s.tv_usec - start.tv_usec) / 1000),
++                cJSON_GetObjectItem(obj_name,"type")->valuestring,
++		((double)(page_size+1)/1877076)*100
+             );
+         }
+ 
+@@ -1161,7 +1165,7 @@ run()
+         char *out;
+         out=cJSON_Print(json_for_output);
+         cJSON_Delete(json_for_output);
+-        printf("%s\n", out);
++    //    printf("%s\n", out);
+         free(out);
+     }
+ 
