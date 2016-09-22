@@ -1,0 +1,3 @@
+> data<-read.table("all_sitesizesKB",header=T)
+> df<-data.frame(data$x)
+> ggplot(df,aes(data$x))+stat_ecdf(geom="step")+ylim(0,1)+labs(x="Site size [KB]", y="Prob.",linetype='custom title',fill="")
