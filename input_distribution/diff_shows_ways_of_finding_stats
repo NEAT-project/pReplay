@@ -1,0 +1,41 @@
+diff --git a/parseDependencyGraph.c b/parseDependencyGraph.c
+index 2030f8e..032d695 100644
+--- a/parseDependencyGraph.c
++++ b/parseDependencyGraph.c
+@@ -74,7 +74,7 @@ void createActivity(char *job_id);
+ int cJSON_HasArrayItem(cJSON *array, const char *string);
+ void onComplete(cJSON *obj_name);
+ 
+-int debug = 1;
++int debug = 0;
+ int total_download_request_from_input=0;
+ double page_load_time = 0.0;
+ unsigned long page_size = 0;
+@@ -1161,9 +1161,10 @@ run()
+         char *out;
+         out=cJSON_Print(json_for_output);
+         cJSON_Delete(json_for_output);
+-        printf("%s\n", out);
++        //printf("%s\n", out);
+         free(out);
+     }
++    
+ 
+     /*printf("],\"num_objects\":%d,\"PLT\":%f, \"page_size\":%ld}\n",
+         object_count,
+@@ -1523,8 +1524,13 @@ int main (int argc, char * argv[]) {
+     dofile(testfile);
+     pthread_mutex_destroy(&lock);
+ 
+-    //sleep(2);
+-
++    if (strrchr(testfile, '/') == NULL) {
++    	printf("%s, objects: %d, size: %ld, (~0 RTT) PLT: %f \n",testfile, object_count,page_size, page_load_time);
++    }
++    else{
++    	printf("%s, objects: %d, size: %ld, (~0 RTT) PLT: %f \n",strrchr(testfile,'/')+1, 
++					object_count,page_size, page_load_time);
++    }	
+     //cJSON_Delete(json);
+     return 0;
+ }
