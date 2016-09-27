@@ -1,0 +1,12 @@
+{
+  "url": "stackoverflow",
+  "num_objects": 24,
+  "PLT": 2599.735,
+  "page_size": 600434,
+  "RTT": 20,
+  "PLR": 0.015,
+  "CSZ": 2048,
+  "NC": 1,
+  "PROTOCOL": "http",
+  "COUNT": 3
+}

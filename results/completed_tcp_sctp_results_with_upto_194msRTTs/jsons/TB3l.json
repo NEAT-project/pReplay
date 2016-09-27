@@ -1,0 +1,12 @@
+{
+  "url": "go",
+  "num_objects": 55,
+  "PLT": 6809.919,
+  "page_size": 1877076,
+  "RTT": 80,
+  "PLR": 0.015,
+  "CSZ": 512,
+  "NC": 18,
+  "PROTOCOL": "http",
+  "COUNT": 4
+}
