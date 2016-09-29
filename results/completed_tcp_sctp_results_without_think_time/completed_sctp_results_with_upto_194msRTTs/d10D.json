@@ -1,0 +1,12 @@
+{
+  "url": "theguardian",
+  "num_objects": 228,
+  "PLT": 17078.531,
+  "page_size": 3147398,
+  "RTT": 80,
+  "PLR": 0.015,
+  "CSZ": 0,
+  "NC": 1,
+  "PROTOCOL": "phttpget",
+  "COUNT": 0
+}
