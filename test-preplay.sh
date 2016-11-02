@@ -3,7 +3,7 @@
 a=0
 while [ "$a" -lt 10 ]    # this is loop1
 do
-	./pReplay localhost tree_folder/www.theguardian.com_us.json phttpget
+	./pReplay 192.168.56.2 tree_folder/www.theguardian.com_us.json phttpget
 	a=`expr $a + 1`
 	sleep 5
 done
