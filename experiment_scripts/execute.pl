@@ -205,7 +205,7 @@ while ($tcidx < @bwdown) {
                   system("sudo tcpdump -n -i $client_interface -U -s 0 -w /tmp/temp.pcap   src host 10.0.3.1 or dst host 10.0.3.1  and sctp &");
                 }
                 system("sleep 1");
-
+                $ENV{HTTP_USE_PIPELINING}='NO';
                 system("./pReplay $server $dir$array $protocol $no_connects  $cookie_size > $jsonoutfilname");
 
                 system("sudo killall tcpdump");
