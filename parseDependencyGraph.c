@@ -102,7 +102,7 @@ int num_transfers = 0;
 int protocol = HTTP1;
 int transport_protocol = IPPROTO_TCP;
 int request_count = 0;
-int max_con = 0;
+int max_con = 6;
 CURL *easyh1[EASY_HANDLES];
 //CURL *easyh1;
 int *worker_status;
@@ -377,8 +377,9 @@ phttpget_start_programm() {
     int phttpget_status = 0;
 
     /* try to run phttpget in background */
-    snprintf(phttpget_argument, STRING_BUFFER, "HTTP_PIPE=YES ./phttpget %s > phttpget.log 2>&1", server);
+    snprintf(phttpget_argument, STRING_BUFFER, "HTTP_PIPE=YES HTTP_SCTP_MAX_STREAMS=%d ./phttpget %s > phttpget.log 2>&1", max_con, server);
     //snprintf(phttpget_argument, STRING_BUFFER, "HTTP_PIPE=YES ./phttpget %s", server);
+    //fprintf(stderr, "%s\n", phttpget_argument);
     phttpget_status = system(phttpget_argument);
 
     fprintf(stderr, "phttpget terminated .... should not see me! - status : %d\n", phttpget_status);
@@ -1434,6 +1435,20 @@ int main (int argc, char * argv[]) {
     server = argv[1];
     testfile = argv[2];
 
+    /* User defined max parallel conn */
+    if (argc > 4){
+        max_con = strtol(argv[4], NULL, 10);
+        if (max_con < 1){
+            fprintf(stderr, "Invalid number of connections\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    worker_status = malloc(max_con * sizeof(worker_status[0]));
+    for (int i=0;i<max_con;i++){
+        worker_status[i]=0;
+    }
+
     /* User defined a protocol via arguments - HTTP1 is default */
     if (argc > 3) {
         if (strcmp(argv[3], "http2") == 0) {
@@ -1462,25 +1477,6 @@ int main (int argc, char * argv[]) {
         } else {
             fprintf(stderr, "Protocol not supported\n");
             exit(EXIT_FAILURE);
-        }
-    }
-
-    /* User defined max parallel conn */
-    if (argc > 4){
-        max_con = strtol(argv[4], NULL, 10);
-        if (max_con < 1){
-            fprintf(stderr, "Invalid number of connections\n");
-            exit(EXIT_FAILURE);
-        }
-        worker_status = malloc(max_con * sizeof(worker_status[0]));
-        for (int i=0; i<max_con; i++){
-            worker_status[i]=0;
-        }
-    } else {
-        max_con = 6;
-        worker_status = malloc(max_con * sizeof(worker_status[0]));
-        for (int i=0;i<max_con;i++){
-            worker_status[i]=0;
         }
     }
 
