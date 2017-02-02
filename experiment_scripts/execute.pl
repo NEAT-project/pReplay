@@ -1,26 +1,28 @@
 #!/usr/bin/perl
 
-$server="10.0.4.1";
+$server="10.0.4.1";   
 $client="10.0.3.1";
-$rctrl="root\@192.168.1.114";
-$sctrl="root\@192.168.1.141";
+$rctrl="root\@192.168.60.178";
+$sctrl="root\@192.168.60.170";
 
 # --- Transport layer initialization ---
 # These values are the default TCP
 # values.
 #
+system("ip route add 10.0.4.0 via 10.0.3.2 proto static initcwnd 3");
+
 # Caching is disabled though
-#
+# 
 system("sudo sysctl -w net.ipv4.tcp_no_metrics_save=1");
-system("ssh $sctrl sysctl net.inet.tcp.hostcache.expire=1");
-system("ssh $sctrl sysctl net.inet.tcp.hostcache.purge=1");
-system("ssh $sctrl  sysctl net.inet.tcp.hostcache.purgenow=1");
+system("sudo sysctl -w net.ipv4.tcp_reordering=3");
+system("sudo sysctl -w net.ipv4.tcp_timestamps=1");
+system("sudo sysctl -w net.ipv4.tcp_dsack=1");
+
 
 system("sudo sysctl -w net.ipv4.tcp_reordering=3");
 # default is 3 in FreeBSD goo.gl/Xvvvvc
 
 system("sudo sysctl -w net.ipv4.tcp_congestion_control=reno");
-system("ssh $sctrl  sysctl net.inet.tcp.cc.algorithm=newreno");
 
 system("sudo sysctl -w net.ipv4.tcp_timestamps=1");
 system("sudo sysctl -w net.core.optmem_max=16777216");
@@ -32,20 +34,12 @@ system("sudo sysctl -w net.ipv4.tcp_mem='16777216 16777216 16777216'");
 system("sudo sysctl -w net.ipv4.tcp_rmem='16777216 16777216 16777216'");
 system("sudo sysctl -w net.ipv4.tcp_wmem='16777216 16777216 16777216'");
 
-system("ssh $sctrl sysctl net.inet.tcp.rfc1323=1");
-system("ssh $sctrl sysctl net.inet.tcp.sendspace=233016");
-
-system("ssh $sctrl sysctl net.inet.tcp.recvspace=233016");
-
-system("ssh $sctrl sysctl net.inet.tcp.recvbuf_auto=1");
 
 #Disable SS after idle
 system("sudo sysctl -w net.ipv4.tcp_slow_start_after_idle=0");
 
 # Disable offloading to get sensible dumps
 system("sudo ethtool -K enp2s0 gso off tso off gro off lro off");
-system("ssh $sctrl sysctl net.inet.tcp.tso=0");
-
 
 # --- Experimental framework initialization ---
 
@@ -83,26 +77,17 @@ $client_interface="enp2s0";
 # --- Experiment parameters ---
 
 # Emulated bandwidth (down and up)
-#@bwdown=("5Mbit/s");
+@bwdown=("10Mbit/s");
 #@bwup=("5Mbit/s");
-@bwdown=("0");
-@bwup=("0");
+#@bwdown=("100Mbit/s","10Mbit/s", "2Mbit/s");
+$bwup="5Mbit/s";
 
 # Emulated end-to-end delay
-#@delay=(10,40,97);
-@delay=(10,40,97,400);
-#@delay=(40,97);
-#@plr=(0,0.03);
+@delay=(0,10,25,50,100,400);
 @plr=(0,.015,0.03);
-#@plr=(0.03);
-#@no_connects=(1,6,18);
 @no_connects=(1,6,18);
-#@no_connects=(1);
-#@cookie_size=(0,512,2048);
-@cookie_size=(0,512,2048);
-#@cookie_size=(0);
-#@protocol=("http","phttpget");
-@protocol=("http");
+@cookie_size=(0);
+@protocol=("http","phttpget");
 
 # Queue size used in network emulator
 $queue=100;
@@ -113,14 +98,15 @@ $packets=1;
 $size=$packets;
 $ckon=0;
 
-$dir = "selected_sites/";
+$dir = "exp_urls/";
 opendir(BIN, $dir) or die "Can't open $dir: $!";
 
 while( $file=readdir BIN ){
+	 if($file eq "." || $file eq ".."){ next;}
          push @array,$file;
 }
 
-@array = @array[ 2 .. $#array ];
+#@array = @array[ 2 .. $#array ];
 
 
 $replications=5;
@@ -129,7 +115,7 @@ $replications=5;
 # --- Experiment execution ---
 
 $tcidx=0;
-while ($tcidx < @bwdown) {
+foreach $bwdown (@bwdown) {
 	foreach $protocol (@protocol){
 		foreach $delay (@delay) {
 			foreach $plr (@plr) {
@@ -144,12 +130,12 @@ while ($tcidx < @bwdown) {
 							#system("sudo sysctl -w net.ipv4.tcp_moderate_rcvbuf=1");
 							#system("ssh $sctrl sudo sysctl -w net.ipv4.tcp_moderate_rcvbuf=1");
 
-							# Remove old emulation settings
+							# Remove old emulation settings 
 				  			system("ssh $rctrl ipfw -f flush");
 				 			system("ssh $rctrl ipfw -f pipe flush");
 			 	  			system("ssh $rctrl ipfw add drop icmp from any to any out icmptypes 4");
 
-							# Create new emulation pipes
+							# Create new emulation pipes 
 							if($protocol eq "http"){
 								print "Setting TCP pipe\n";
 				  				system("ssh $rctrl ipfw add 3 pipe 200 tcp from $client to $server in");
@@ -161,63 +147,51 @@ while ($tcidx < @bwdown) {
 							}
 
 							# Configure new emulation settings
-							system("ssh $rctrl ipfw pipe 200 config bw $bwdown[$tcidx] delay $delay queue $queue");
-				 			system("ssh $rctrl ipfw pipe 300 config bw $bwup[$tcidx] delay $delay  plr $plr queue $queue");
+							system("ssh $rctrl ipfw pipe 200 config bw $bwdown delay $delay queue $queue");
+				 			system("ssh $rctrl ipfw pipe 300 config bw $bwup delay $delay  plr $plr queue $queue");
 				 			#system("ssh $rctrl ipfw pipe 300 config bw $bwup[$tcidx] delay $delay plr 0.2 queue $queue");
 
-				  			if ($writesyslog==1) {
-			    				open (FDR, ">>$log_filnamn");
-				    			print FDR "\n=========================\n";
-				    			print FDR "testnr:$testcount  $bwdown[$tcidx]-$bwup[$tcidx]  $delay ms   $queue packets \n";
-			    				print FDR "Size:$size Loss=$packlfile lossdiff:$ckon \n========================\n\n";
-			    				open (SOUT,"ssh $rctrl ipfw pipe show|");
-			    				@tmp=<SOUT>;
-				    			print FDR @tmp;
-				    			close (SOUT);
-			    				close (FDR);
-								system("date >> $log_filnamn");
-				  			}
-
-							open (FDR, ">>$outfilnamn");
-				  			printf FDR ("%4i %10s %10s %3d %3d %3d     %s      %1d \n ",$testcount,$bwdown[$tcidx],$bwup[$tcidx],$delay,$queue,$size,$plr,$ckon);
-				  			close (FDR);
-
 							# Log traffic at server, pause, and ping a little :)
-							if($protocol eq "http"){
-			 	  				system("ssh -f $sctrl tcpdump -n -i $server_interface -s 0 -U -w /tmp/temp.pcap  src host 10.0.3.1 or dst host 10.0.3.1 &");
-							}else{
-			 	  				system("ssh -f $sctrl tcpdump -n -i $server_interface -s 0 -U -w /tmp/temp.pcap  src host 10.0.3.1 or dst host 10.0.3.1 and sctp &");
-							}
+						#	if($protocol eq "http"){
+			 	  		#		system("ssh -f $sctrl tcpdump -n -i $server_interface -s 0 -U -w /tmp/temp.pcap  src host 10.0.3.1 or dst host 10.0.3.1 &");
+						#	}else{
+			 	  		#		system("ssh -f $sctrl tcpdump -n -i $server_interface -s 0 -U -w /tmp/temp.pcap  src host 10.0.3.1 or dst host 10.0.3.1 and sctp &");
+						#	}
 				#			system("sleep 5");
 					#		system("ping -c 10 $server");
 					#		system("ssh $sctrl ping -c 10 $client");
-							system("sleep 5");
+						#	system("sleep 5");
+							
+						#	$ENV{HTTP_USE_PIPELINING}='NO';
+							
 
 							# Start logging and execution of experiment at the client
 							$rtt=$delay*2;
-			                                $outfilname="/root/test_log/".'site.'.$array.'_rtt.'.$rtt.'_plr.'.$plr.'_csz.'.$cookie_size.'_nc.'.$no_connects.'_ptl.'.$protocol.'_';
-			                                $jsonoutfilname="/root/test_log/".'site.'.$array.'_rtt.'.$rtt.'_plr.'.$plr.'_csz.'.$cookie_size.'_nc.'.$no_connects.'_ptl.'.$protocol.'_count.'.$testcount.'.json';
+							$bw=substr($bwdown,0,index($bwdown,'/'));
+			                                $outfilname="/root/test_log/".'site.'.$array.'_bwdown.'.$bw.'_rtt.'.$rtt.'_plr.'.$plr.'_csz.'.$cookie_size.'_nc.'.$no_connects.'_ptl.'.$protocol.'_';
+			                                $jsonoutfilname="/root/test_log/".'site.'.$array.'_bwdown.'.$bw.'_rtt.'.$rtt.'_plr.'.$plr.'_csz.'.$cookie_size.'_nc.'.$no_connects.'_ptl.'.$protocol.'_count.'.$testcount.'.json';
+							
+                                                #        system ("ssh $rctrl ipfw pipe show > $jsonoutfilname");
 
-
-							if($protocol eq "http"){
-								system("sudo tcpdump -n -i $client_interface -U -s 0 -w /tmp/temp.pcap  src host 10.0.3.1 or dst host 10.0.3.1 &");
-							}else{
-								system("sudo tcpdump -n -i $client_interface -U -s 0 -w /tmp/temp.pcap   src host 10.0.3.1 or dst host 10.0.3.1  and sctp &");
-							}
+						#	if($protocol eq "http"){
+						#		system("sudo tcpdump -n -i $client_interface -U -s 0 -w /tmp/temp.pcap  src host 10.0.3.1 or dst host 10.0.3.1 &");
+						#	}else{
+						#		system("sudo tcpdump -n -i $client_interface -U -s 0 -w /tmp/temp.pcap   src host 10.0.3.1 or dst host 10.0.3.1  and sctp &");
+						#	}
 							system("sleep 1");
 
-							system("./pReplay $server $dir$array $protocol $no_connects  $cookie_size > $jsonoutfilname");
-
-							system("sudo killall tcpdump");
-							system("sudo gzip -f /tmp/temp.pcap");
-							system("cp /tmp/temp.pcap.gz ".$outfilname.$testcount.".pcap.gz");
-							system("ssh $sctrl  killall tcpdump");
-							system("sleep 1");
-							system("ssh -f $sctrl  gzip -f /tmp/temp.pcap");
-							system("sleep 1");
+							system("timeout 1200 ./pReplay $server $dir$array $protocol $no_connects  $cookie_size > $jsonoutfilname");
+					#		
+						#	system("sudo killall tcpdump");
+						#	system("sudo gzip -f /tmp/temp.pcap");
+						#	system("cp /tmp/temp.pcap.gz ".$outfilname.$testcount.".pcap.gz");
+						#	system("ssh $sctrl  killall tcpdump");
+						#	system("sleep 1");
+						#	system("ssh -f $sctrl  gzip -f /tmp/temp.pcap");
+						#	system("sleep 1");
 							#system("ssh -f $sctrl cp /tmp/temp.pcap.gz ".$outfilname."srv".$testcount.".pcap.gz");
-							system("scp $sctrl:/tmp/temp.pcap.gz ".$outfilname."srv".$testcount.".pcap.gz");
-
+						#	system("scp $sctrl:/tmp/temp.pcap.gz ".$outfilname."srv".$testcount.".pcap.gz");
+				
 				  			# Do detailed logging of router statistics
 							if ($writesyslog==1) {
 								open (FDR, ">>$log_filnamn");
@@ -225,7 +199,7 @@ while ($tcidx < @bwdown) {
 								@tmp=<SOUT>;
 								print FDR @tmp;
 								close (SOUT);
-								close (FDR);
+								close (FDR);    
 							}
 							$testcount++;
 						}
@@ -234,8 +208,7 @@ while ($tcidx < @bwdown) {
 		    }
         }
 	}
-}
-$tcidx++;
+}	
 }
 
 system("sleep 1");
