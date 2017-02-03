@@ -80,7 +80,7 @@ $client_interface="enp2s0";
 @bwdown=("10Mbit/s");
 #@bwup=("5Mbit/s");
 #@bwdown=("100Mbit/s","10Mbit/s", "2Mbit/s");
-$bwup="5Mbit/s";
+$bwup="10Mbit/s";
 
 # Emulated end-to-end delay
 @delay=(0,10,25,50,100,400);
