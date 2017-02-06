@@ -6,6 +6,9 @@ $server_interface="igb3";
 $client_interface="enp0s8";
 $rctrl="weinrank\@212.201.121.83 sudo";
 $sctrl="weinrank\@212.201.121.82";
+$replications=5;
+$outfilnamn="./test_log/test_";
+$log_filnamn=$outfilnamn."log";
 
 
 # --- Transport layer initialization ---
@@ -42,18 +45,17 @@ system("sudo sysctl -w net.ipv4.tcp_wmem='16777216 16777216 16777216'");
 system("sudo sysctl -w net.ipv4.tcp_slow_start_after_idle=0");
 
 # Disable offloading to get sensible dumps
-system("sudo ethtool -K enp2s0 gso off tso off gro off lro off");
+system("sudo ethtool -K $client_interface gso off tso off gro off lro off");
 
 # --- Experimental framework initialization ---
 
 # Type of experiment (sysctl controlled vars)
 # None for these experiments
 
-$replications=1;
-$outfilnamn="./test_log/test_";
+
 
 #$writesyslog=1;
-$log_filnamn=$outfilnamn."log";
+
 
 # Reset indices
 $tcidx=0;
@@ -109,7 +111,7 @@ while( $file=readdir BIN ){
 #@array = @array[ 2 .. $#array ];
 
 
-$replications=5;
+
 
 
 # --- Experiment execution ---
