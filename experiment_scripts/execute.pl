@@ -134,7 +134,6 @@ foreach $bwdown (@bwdown) {
 				  			system("ssh $rctrl ipfw -f flush");
 				 			system("ssh $rctrl ipfw -f pipe flush");
 			 	  			system("ssh $rctrl ipfw add drop icmp from any to any out icmptypes 4");
-                            system("ssh $rctrl ipfw add reject sctp port  from any to any out icmptypes 4")
 
 							# Create new emulation pipes
 							if($protocol eq "http"){
