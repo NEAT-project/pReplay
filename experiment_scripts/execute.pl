@@ -1,18 +1,21 @@
 #!/usr/bin/perl
 
-$server="10.0.4.1";   
-$client="10.0.3.1";
-$rctrl="root\@192.168.60.178";
-$sctrl="root\@192.168.60.170";
+$server="10.1.2.2";
+$client="10.1.1.3";
+$server_interface="em1";
+$client_interface="enp2s0";
+$rctrl="weinrank\@212.201.121.83";
+$sctrl="weinrank\@212.201.121.82";
+
 
 # --- Transport layer initialization ---
 # These values are the default TCP
 # values.
 #
-system("ip route add 10.0.4.0 via 10.0.3.2 proto static initcwnd 3");
+#system("ip route add 10.0.4.0 via 10.0.3.2 proto static initcwnd 3");
 
 # Caching is disabled though
-# 
+#
 system("sudo sysctl -w net.ipv4.tcp_no_metrics_save=1");
 system("sudo sysctl -w net.ipv4.tcp_reordering=3");
 system("sudo sysctl -w net.ipv4.tcp_timestamps=1");
@@ -70,10 +73,7 @@ system ("ssh $sctrl  killall tcpdump");
 
 # Add experimental routes
 
-# Ethernet interface
 
-$server_interface="em1";
-$client_interface="enp2s0";
 # --- Experiment parameters ---
 
 # Emulated bandwidth (down and up)
@@ -130,12 +130,13 @@ foreach $bwdown (@bwdown) {
 							#system("sudo sysctl -w net.ipv4.tcp_moderate_rcvbuf=1");
 							#system("ssh $sctrl sudo sysctl -w net.ipv4.tcp_moderate_rcvbuf=1");
 
-							# Remove old emulation settings 
+							# Remove old emulation settings
 				  			system("ssh $rctrl ipfw -f flush");
 				 			system("ssh $rctrl ipfw -f pipe flush");
 			 	  			system("ssh $rctrl ipfw add drop icmp from any to any out icmptypes 4");
+                            system("ssh $rctrl ipfw add reject sctp port  from any to any out icmptypes 4")
 
-							# Create new emulation pipes 
+							# Create new emulation pipes
 							if($protocol eq "http"){
 								print "Setting TCP pipe\n";
 				  				system("ssh $rctrl ipfw add 3 pipe 200 tcp from $client to $server in");
@@ -161,16 +162,16 @@ foreach $bwdown (@bwdown) {
 					#		system("ping -c 10 $server");
 					#		system("ssh $sctrl ping -c 10 $client");
 						#	system("sleep 5");
-							
+
 						#	$ENV{HTTP_USE_PIPELINING}='NO';
-							
+
 
 							# Start logging and execution of experiment at the client
 							$rtt=$delay*2;
 							$bw=substr($bwdown,0,index($bwdown,'/'));
 			                                $outfilname="/root/test_log/".'site.'.$array.'_bwdown.'.$bw.'_rtt.'.$rtt.'_plr.'.$plr.'_csz.'.$cookie_size.'_nc.'.$no_connects.'_ptl.'.$protocol.'_';
 			                                $jsonoutfilname="/root/test_log/".'site.'.$array.'_bwdown.'.$bw.'_rtt.'.$rtt.'_plr.'.$plr.'_csz.'.$cookie_size.'_nc.'.$no_connects.'_ptl.'.$protocol.'_count.'.$testcount.'.json';
-							
+
                                                 #        system ("ssh $rctrl ipfw pipe show > $jsonoutfilname");
 
 						#	if($protocol eq "http"){
@@ -181,7 +182,7 @@ foreach $bwdown (@bwdown) {
 							system("sleep 1");
 
 							system("timeout 1200 ./pReplay $server $dir$array $protocol $no_connects  $cookie_size > $jsonoutfilname");
-					#		
+					#
 						#	system("sudo killall tcpdump");
 						#	system("sudo gzip -f /tmp/temp.pcap");
 						#	system("cp /tmp/temp.pcap.gz ".$outfilname.$testcount.".pcap.gz");
@@ -191,7 +192,7 @@ foreach $bwdown (@bwdown) {
 						#	system("sleep 1");
 							#system("ssh -f $sctrl cp /tmp/temp.pcap.gz ".$outfilname."srv".$testcount.".pcap.gz");
 						#	system("scp $sctrl:/tmp/temp.pcap.gz ".$outfilname."srv".$testcount.".pcap.gz");
-				
+
 				  			# Do detailed logging of router statistics
 							if ($writesyslog==1) {
 								open (FDR, ">>$log_filnamn");
@@ -199,7 +200,7 @@ foreach $bwdown (@bwdown) {
 								@tmp=<SOUT>;
 								print FDR @tmp;
 								close (SOUT);
-								close (FDR);    
+								close (FDR);
 							}
 							$testcount++;
 						}
@@ -208,7 +209,7 @@ foreach $bwdown (@bwdown) {
 		    }
         }
 	}
-}	
+}
 }
 
 system("sleep 1");
