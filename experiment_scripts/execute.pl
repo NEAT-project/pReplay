@@ -4,7 +4,7 @@ $server="10.1.2.2";
 $client="10.1.1.3";
 $server_interface="igb3";
 $client_interface="enp0s8";
-$rctrl="weinrank\@212.201.121.83";
+$rctrl="weinrank\@212.201.121.83 sudo";
 $sctrl="weinrank\@212.201.121.82";
 
 
@@ -69,7 +69,7 @@ print FDR "Nr    BandwDown  BandwUp   Del Que Fsize  DrpCnt  Lossdiff  Time   \n
 close (FDR);
 
 # Remove previous application instances
-system ("ssh $sctrl  killall tcpdump");
+#system ("ssh $sctrl  killall tcpdump");
 
 # Add experimental routes
 
