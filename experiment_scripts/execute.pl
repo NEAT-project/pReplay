@@ -2,8 +2,8 @@
 
 $server="10.1.2.2";
 $client="10.1.1.3";
-$server_interface="em1";
-$client_interface="enp2s0";
+$server_interface="igb3";
+$client_interface="enp0s8";
 $rctrl="weinrank\@212.201.121.83";
 $sctrl="weinrank\@212.201.121.82";
 
@@ -50,7 +50,7 @@ system("sudo ethtool -K enp2s0 gso off tso off gro off lro off");
 # None for these experiments
 
 $replications=1;
-$outfilnamn="/root/test_log/test_";
+$outfilnamn="./test_log/test_";
 
 #$writesyslog=1;
 $log_filnamn=$outfilnamn."log";
@@ -168,8 +168,8 @@ foreach $bwdown (@bwdown) {
 							# Start logging and execution of experiment at the client
 							$rtt=$delay*2;
 							$bw=substr($bwdown,0,index($bwdown,'/'));
-			                                $outfilname="/root/test_log/".'site.'.$array.'_bwdown.'.$bw.'_rtt.'.$rtt.'_plr.'.$plr.'_csz.'.$cookie_size.'_nc.'.$no_connects.'_ptl.'.$protocol.'_';
-			                                $jsonoutfilname="/root/test_log/".'site.'.$array.'_bwdown.'.$bw.'_rtt.'.$rtt.'_plr.'.$plr.'_csz.'.$cookie_size.'_nc.'.$no_connects.'_ptl.'.$protocol.'_count.'.$testcount.'.json';
+			                                $outfilname="./test_log/".'site.'.$array.'_bwdown.'.$bw.'_rtt.'.$rtt.'_plr.'.$plr.'_csz.'.$cookie_size.'_nc.'.$no_connects.'_ptl.'.$protocol.'_';
+			                                $jsonoutfilname="./test_log/".'site.'.$array.'_bwdown.'.$bw.'_rtt.'.$rtt.'_plr.'.$plr.'_csz.'.$cookie_size.'_nc.'.$no_connects.'_ptl.'.$protocol.'_count.'.$testcount.'.json';
 
                                                 #        system ("ssh $rctrl ipfw pipe show > $jsonoutfilname");
 
