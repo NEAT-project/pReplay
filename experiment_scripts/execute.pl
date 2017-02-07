@@ -5,7 +5,7 @@ $client="10.1.1.3";
 $server_interface="igb3";
 $client_interface="enp0s8";
 $rctrl="weinrank\@212.201.121.83 sudo";
-$sctrl="weinrank\@212.201.121.82";
+$sctrl="weinrank\@212.201.121.82 sudo";
 $replications=5;
 $outfilnamn="./test_log/test_";
 $log_filnamn=$outfilnamn."log";
@@ -47,7 +47,20 @@ system("sudo sysctl -w net.ipv4.tcp_slow_start_after_idle=0");
 # Type of experiment (sysctl controlled vars)
 # None for these experiments
 
-
+# SERVER SETTINGS
+system("ssh $sctrl sysctl net.inet.tcp.hostcache.expire=1");
+system("ssh $sctrl sysctl net.inet.tcp.hostcache.purge=1");
+system("ssh $sctrl sysctl net.inet.tcp.hostcache.purgenow=1");
+system("ssh $sctrl sysctl net.inet.tcp.cc.algorithm=newreno");
+system("ssh $sctrl sysctl net.inet.tcp.rfc1323=1");
+system("ssh $sctrl sysctl net.inet.tcp.sendspace=1864135");
+system("ssh $sctrl sysctl net.inet.tcp.recvspace=1864135");
+system("ssh $sctrl sysctl net.inet.tcp.recvbuf_auto=1");
+system("ssh $sctrl sysctl net.inet.tcp.tso=0");
+#SCTP settings
+system("ssh $sctrl sysctl net.inet.sctp.initial_cwnd=10");
+system("ssh $sctrl sysctl net.inet.sctp.maxburst=10");
+system("ssh $sctrl sysctl net.inet.sctp.heartbeat_interval=3000000");
 
 #$writesyslog=1;
 
@@ -129,34 +142,34 @@ foreach $bwdown (@bwdown) {
                     foreach $cookie_size (@cookie_size) {
                         foreach $array (@array){
                             #print "$delay $plr $no_connects $cookie_size\n";
-                            $repcount=$replications;
-                            $testcount=0;
+                            $repcount = $replications;
+                            $testcount = 0;
                             while ($repcount--) {
                                 $test_iterator++;
-                                print "# test $test_iterator / $test_iterator_max\n";
-                                next;
+                                print "# test $test_iterator/$test_iterator_max -- $bwdown|$delay|$plr|$no_connects|$cookie_size|$array|$repcount\n";
+                                #next;
                                 #system("sudo sysctl -w net.ipv4.tcp_moderate_rcvbuf=1");
                                 #system("ssh $sctrl sudo sysctl -w net.ipv4.tcp_moderate_rcvbuf=1");
 
                                 # Remove old emulation settings
-                                system("ssh $rctrl ipfw -f flush");
-                                system("ssh $rctrl ipfw -f pipe flush");
-                                system("ssh $rctrl ipfw add drop icmp from any to any out icmptypes 4");
+                                system("ssh $rctrl ipfw -f flush > /dev/null");
+                                system("ssh $rctrl ipfw -f pipe flush > /dev/null");
+                                system("ssh $rctrl ipfw add drop icmp from any to any out icmptypes 4 > /dev/null");
 
                                 # Create new emulation pipes
-                                if ($protocol eq "http"){
-                                    print "Setting TCP pipe\n";
-                                    system("ssh $rctrl ipfw add 3 pipe 200 tcp from $client to $server in");
-                                    system("ssh $rctrl ipfw add 4 pipe 300 tcp from $server to $client in");
+                                if ($protocol eq "http") {
+                                    #print "Setting TCP pipe\n";
+                                    system("ssh $rctrl ipfw add 3 pipe 200 tcp from $client to $server in > /dev/null");
+                                    system("ssh $rctrl ipfw add 4 pipe 300 tcp from $server to $client in > /dev/null");
                                 } else {
-                                    print "Setting SCTP pipe\n";
-                                    system("ssh $rctrl ipfw add 3 pipe 200 sctp from $client to $server in");
-                                    system("ssh $rctrl ipfw add 4 pipe 300 sctp from $server to $client in");
+                                    #print "Setting SCTP pipe\n";
+                                    system("ssh $rctrl ipfw add 3 pipe 200 sctp from $client to $server in > /dev/null");
+                                    system("ssh $rctrl ipfw add 4 pipe 300 sctp from $server to $client in > /dev/null");
                                 }
 
                                 # Configure new emulation settings
-                                system("ssh $rctrl ipfw pipe 200 config bw $bwdown delay $delay queue $queue");
-                                system("ssh $rctrl ipfw pipe 300 config bw $bwup delay $delay  plr $plr queue $queue");
+                                system("ssh $rctrl ipfw pipe 200 config bw $bwdown delay $delay queue $queue > /dev/null");
+                                system("ssh $rctrl ipfw pipe 300 config bw $bwup delay $delay  plr $plr queue $queue > /dev/null");
                                 #system("ssh $rctrl ipfw pipe 300 config bw $bwup[$tcidx] delay $delay plr 0.2 queue $queue");
 
                                 # Log traffic at server, pause, and ping a little :)
