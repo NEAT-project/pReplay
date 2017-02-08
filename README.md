@@ -57,7 +57,7 @@ pidfile=/var/run/thttpd.pid
 max_age=0
 ```
 
-tested with FreeBSd
+tested with FreeBSD
 
 ## info
 pReplay has been tested with curl-7.47.1
