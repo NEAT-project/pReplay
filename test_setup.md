@@ -1,26 +1,26 @@
 # Experiment setup
 
 ## Parameter set
-* **pages**
+* pages
   * www.google.com.hk_.json
   * www.dmm.co.jp_.json
   * www.siteadvisor.com_.json
   * www.amazon.co.jp_.json
   * pinterst.com_.json
   * www.mediafire.com_.json
-* **bandwidth** : 10 Mbps
-* **rtt** : 0, 20, 50, 100, 200, 800 ms
-* **plr** : 0, 1.5, 3 %
-* **# connections/streams** : 1, 6, 18
-* **repetitions** : 30
-* **no think time**
-* **no cookie size*
-* **TCP: pReplay + curl**
-* **SCTP: pReplay + phttpget**
+* bandwidth : 10 Mbps
+* rtt : 0, 20, 50, 100, 200, 800 ms
+* plr : 0, 1.5, 3 %
+* # connections/streams : 1, 6, 18
+* repetitions : 30
+* no think time
+* no cookie size
+* TCP: pReplay + curl
+* SCTP: pReplay + phttpget
 
 ## Software
 * thttpd
- * https://github.com/nplab/thttpd/tree/multistream
+ * https://github.com/nplab/thttpd
  * branch: **multistream**
 * pReplay
  * https://github.com/NEAT-project/pReplay
