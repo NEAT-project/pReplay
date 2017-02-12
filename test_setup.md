@@ -19,3 +19,13 @@
 ```
 client (Linux) <<--->> dummynet router (FreeBSD) <<--->> server (FreeBSD)
 ```
+### FHM
+All machines are running the OS bare metal.
+* client
+ * Ubuntu 16.10
+* dummynet router
+ * FreeBSD HEAD (Feb 2012)
+ * Kernel: GENERIC-NODEBUG
+* server
+ * FreeBSD HEAD (Feb 2012)
+ * Kernel: GENERIC-NODEBUG
