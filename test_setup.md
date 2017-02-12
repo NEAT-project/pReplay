@@ -13,6 +13,7 @@
 * **plr** : 0, 1.5, 3 %
 * **# connections/streams** : 1, 6, 18
 * **repetitions** : 30
+* **no think time**
 
 ## Machine setup
 ```
