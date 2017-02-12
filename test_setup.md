@@ -14,6 +14,9 @@
 * **# connections/streams** : 1, 6, 18
 * **repetitions** : 30
 * **no think time**
+* **no cookie size*
+* **TCP: pReplay + curl**
+* **SCTP: pReplay + phttpget**
 
 ## Software
 * thttpd
