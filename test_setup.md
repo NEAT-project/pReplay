@@ -15,6 +15,17 @@
 * **repetitions** : 30
 * **no think time**
 
+## Software
+* thttpd
+ * https://github.com/nplab/thttpd/tree/multistream
+ * branch: **multistream**
+* pReplay
+ * https://github.com/NEAT-project/pReplay
+ * branch: **master**
+* phttpget
+ * https://github.com/NEAT-project/HTTPOverSCTP
+ * branch: **multistream**
+
 ## Machine setup
 ```
 client (Linux) <<--->> dummynet router (FreeBSD) <<--->> server (FreeBSD)
@@ -24,8 +35,8 @@ All machines are running the OS bare metal.
 * client
  * Ubuntu 16.10
 * dummynet router
- * FreeBSD HEAD (Feb 2012)
+ * FreeBSD HEAD (Feb 2017)
  * Kernel: GENERIC-NODEBUG
 * server
- * FreeBSD HEAD (Feb 2012)
+ * FreeBSD HEAD (Feb 2017)
  * Kernel: GENERIC-NODEBUG
