@@ -10,8 +10,9 @@
   * www.mediafire.com_.json
 * bandwidth : 10 Mbps
 * rtt : 0, 20, 50, 100, 200, 800 ms
-* plr : 0, 1.5, 3 %
-* # connections/streams : 1, 6, 18
+* plr : 0, 1.5 %
+* # TCP connections: 1, 6, 18 
+* # SCTP streams: 1, 100
 * repetitions : 30
 * no think time
 * no cookie size
