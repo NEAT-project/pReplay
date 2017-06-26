@@ -220,6 +220,7 @@ run_worker(void *arg)
     long header_bytes = 0;
     double transfer_time = 0;
     double end_time = 0;
+    struct timeval ts;
     struct timeval te;
 
     if (j != -1){
@@ -247,7 +248,7 @@ run_worker(void *arg)
                 break;
             }
         }
-
+        gettimeofday(&ts,NULL);
 
         if ((res = curl_easy_setopt(easyh1[i], CURLOPT_WRITEFUNCTION, memory_callback)) != CURLE_OK) {
             fprintf(stderr, "cURL option error: %s\n", curl_easy_strerror(res));
@@ -303,12 +304,14 @@ run_worker(void *arg)
             if (first_object == 0) {
                 //printf("{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
                 cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
-                cJSON_AddNumberToObject(temp_download_size,"S",total_bytes);
+                cJSON_AddNumberToObject(temp_download_size,"S",ts.tv_sec);
+                cJSON_AddNumberToObject(temp_download_size,"Sz",total_bytes);
                 cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
                 first_object = 1;
             } else {
                 cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
-                cJSON_AddNumberToObject(temp_download_size,"S",total_bytes);
+                cJSON_AddNumberToObject(temp_download_size,"S",ts.tv_sec);
+                cJSON_AddNumberToObject(temp_download_size,"Sz",total_bytes);
                 cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
                // printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
             }
@@ -934,9 +937,9 @@ setTimeout(int ms, char *s)
         );
     }
 
-    /*tim.tv_sec = ms / 1000;
+    tim.tv_sec = ms / 1000;
     tim.tv_nsec = (ms % 1000) * NANOSLEEP_MS_MULTIPLIER;
-    nanosleep(&tim, &tim2);*/
+    nanosleep(&tim, &tim2);
 
     gettimeofday(&te, NULL);
     if (debug) {
