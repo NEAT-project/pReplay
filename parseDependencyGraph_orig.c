@@ -74,7 +74,7 @@ void createActivity(char *job_id);
 int cJSON_HasArrayItem(cJSON *array, const char *string);
 void onComplete(cJSON *obj_name);
 
-int debug = 0;
+int debug = 1;
 int total_download_request_from_input=0;
 double page_load_time = 0.0;
 unsigned long page_size = 0;
@@ -121,105 +121,6 @@ pthread_mutex_t phttpget_write_mutex = PTHREAD_MUTEX_INITIALIZER;
 TAILQ_HEAD(phttpget_request_queue, phttpget_request);
 struct phttpget_request_queue phttpget_requests_pending;
 /* PHTTPGET STUFF END */
-
-/* a handle to number lookup, highly ineffective when we do many
-   transfers... */ 
-static int hnd2num(CURL *hnd)
-{
-  int i;
-  for(i=0; i< num_transfers; i++) {
-    if(curl_hnd[i] == hnd)
-      return i;
-  }
-  return 0; /* weird, but just a fail-safe */ 
-}
- 
-static
-void dump(const char *text, int num, unsigned char *ptr, size_t size,
-          char nohex)
-{
-  size_t i;
-  size_t c;
- 
-  unsigned int width=0x10;
- 
-  if(nohex)
-    /* without the hex output, we can fit more on screen */ 
-    width = 0x40;
- 
-  fprintf(stderr, "%d %s, %ld bytes (0x%lx)\n",
-          num, text, (long)size, (long)size);
- 
-  for(i=0; i<size; i+= width) {
- 
-    fprintf(stderr, "%4.4lx: ", (long)i);
- 
-    if(!nohex) {
-      /* hex not disabled, show it */ 
-      for(c = 0; c < width; c++)
-        if(i+c < size)
-          fprintf(stderr, "%02x ", ptr[i+c]);
-        else
-          fputs("   ", stderr);
-    }
- 
-    for(c = 0; (c < width) && (i+c < size); c++) {
-      /* check for 0D0A; if found, skip past and start a new line of output */ 
-      if(nohex && (i+c+1 < size) && ptr[i+c]==0x0D && ptr[i+c+1]==0x0A) {
-        i+=(c+2-width);
-        break;
-      }
-      fprintf(stderr, "%c",
-              (ptr[i+c]>=0x20) && (ptr[i+c]<0x80)?ptr[i+c]:'.');
-      /* check again for 0D0A, to avoid an extra \n if it's at width */ 
-      if(nohex && (i+c+2 < size) && ptr[i+c+1]==0x0D && ptr[i+c+2]==0x0A) {
-        i+=(c+3-width);
-        break;
-      }
-    }
-    fputc('\n', stderr); /* newline */ 
-  }
-}
- 
-static
-int my_trace(CURL *handle, curl_infotype type,
-             char *data, size_t size,
-             void *userp)
-{
-  const char *text;
-  int num = hnd2num(handle);
-  (void)handle; /* prevent compiler warning */ 
-  (void)userp;
-  switch(type) {
-  case CURLINFO_TEXT:
-    fprintf(stderr, "== %d Info: %s", num, data);
-  default: /* in case a new one is introduced to shock us */ 
-    return 0;
- 
-  case CURLINFO_HEADER_OUT:
-    text = "=> Send header";
-    break;
-  case CURLINFO_DATA_OUT:
-    text = "=> Send data";
-    break;
-  case CURLINFO_SSL_DATA_OUT:
-    text = "=> Send SSL data";
-    break;
-  case CURLINFO_HEADER_IN:
-    text = "<= Recv header";
-    break;
-  case CURLINFO_DATA_IN:
-    text = "<= Recv data";
-    break;
-  case CURLINFO_SSL_DATA_IN:
-    text = "<= Recv SSL data";
-    break;
-  }
- 
-  dump(text, num, (unsigned char *)data, size, 1);
-  return 0;
-}
-
 
 static size_t
 memory_callback(void *contents, size_t size, size_t nmemb, void *userp)
@@ -319,9 +220,7 @@ run_worker(void *arg)
     long header_bytes = 0;
     double transfer_time = 0;
     double end_time = 0;
-    struct timeval ts;
     struct timeval te;
-    double time_in_mill;
 
     if (j != -1){
         obj = cJSON_GetArrayItem(this_objs_array, j);
@@ -348,7 +247,6 @@ run_worker(void *arg)
                 break;
             }
         }
-        gettimeofday(&ts,NULL);
 
 
         if ((res = curl_easy_setopt(easyh1[i], CURLOPT_WRITEFUNCTION, memory_callback)) != CURLE_OK) {
@@ -401,20 +299,16 @@ run_worker(void *arg)
         page_size+=(long)bytes;
 
         object_count++;
-	 if (json_output == 1) {
+        if (json_output == 1) {
             if (first_object == 0) {
                 //printf("{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
                 cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
-		time_in_mill = (ts.tv_sec) * 1000 + (ts.tv_usec) / 1000 ;
-                cJSON_AddNumberToObject(temp_download_size,"S",time_in_mill);
-                cJSON_AddNumberToObject(temp_download_size,"Sz",total_bytes);
+                cJSON_AddNumberToObject(temp_download_size,"S",total_bytes);
                 cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
                 first_object = 1;
             } else {
                 cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
-		time_in_mill = (ts.tv_sec) * 1000 + (ts.tv_usec) / 1000 ;
-                cJSON_AddNumberToObject(temp_download_size,"S",time_in_mill);
-                cJSON_AddNumberToObject(temp_download_size,"Sz",total_bytes);
+                cJSON_AddNumberToObject(temp_download_size,"S",total_bytes);
                 cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
                // printf(",{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
             }
@@ -465,7 +359,7 @@ global_array_sum()
 
 /* a handle to number lookup, highly ineffective when we do many
    transfers... */
-/*static int
+static int
 hnd2num(CURL *hnd)
 {
     int i;
@@ -473,9 +367,9 @@ hnd2num(CURL *hnd)
         if (curl_hnd[i] == hnd) {
             return i;
         }
-    }*/
-   // return 0; /* weird, but just a fail-safe */
-//}
+    }
+    return 0; /* weird, but just a fail-safe */
+}
 
 void *
 phttpget_start_programm() {
@@ -743,7 +637,7 @@ request_url(void *arg)
         int res = 0;
 
 
-        snprintf(url, sizeof url,"%s%s%s%s","http://", server, ":8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
+        snprintf(url, sizeof url,"%s%s%s%s","https://", server, ":8000",cJSON_GetObjectItem(this_obj,"path")->valuestring);
         //if (debug==1 && json_output==0)
         //printf("URL: %s\n",url);
         //printf("when_comp_start--: %d\n",cJSON_GetObjectItem(this_obj,"when_comp_start")->valueint);
@@ -772,8 +666,8 @@ request_url(void *arg)
         curl_easy_setopt(eh, CURLOPT_URL, url);
 
         /* send it verbose for max debuggaility */
-        curl_easy_setopt(eh, CURLOPT_VERBOSE, 1L);
-        curl_easy_setopt(eh, CURLOPT_DEBUGFUNCTION, my_trace);
+        //curl_easy_setopt(hnd, CURLOPT_VERBOSE, 1L);
+        //curl_easy_setopt(hnd, CURLOPT_DEBUGFUNCTION, my_trace);
 
         /* HTTP/2 please */
         curl_easy_setopt(eh, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2_0);
@@ -1040,9 +934,9 @@ setTimeout(int ms, char *s)
         );
     }
 
-    /*tim.tv_sec = ms / 1000;
+    tim.tv_sec = ms / 1000;
     tim.tv_nsec = (ms % 1000) * NANOSLEEP_MS_MULTIPLIER;
-    nanosleep(&tim, &tim2);*/
+    nanosleep(&tim, &tim2);
 
     gettimeofday(&te, NULL);
     if (debug) {
@@ -1058,7 +952,7 @@ void
 {
     cJSON *obj_name = arg;
     //printf("Time out value: %d, object name: %s\n",cJSON_GetObjectItem(obj_name,"time")->valueint, cJSON_GetObjectItem(obj_name,"obj_id")->valuestring);
-   // setTimeout(cJSON_GetObjectItem(obj_name, "time")->valueint, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
+    setTimeout(cJSON_GetObjectItem(obj_name, "time")->valueint, cJSON_GetObjectItem(obj_name, "obj_id")->valuestring);
     onComplete(obj_name);
     pthread_mutex_lock(&thread_count_mutex);
     thread_count--;
@@ -1076,7 +970,7 @@ void
 *createActivityAfterTimeout(void *arg)
 {
     cJSON *trigger = arg;
-    //setTimeout(cJSON_GetObjectItem(trigger, "time")->valueint, cJSON_GetObjectItem(trigger, "id")->valuestring);
+    setTimeout(cJSON_GetObjectItem(trigger, "time")->valueint, cJSON_GetObjectItem(trigger, "id")->valuestring);
     createActivity(cJSON_GetObjectItem(trigger, "id")->valuestring);
 
     pthread_mutex_lock(&thread_count_mutex);
