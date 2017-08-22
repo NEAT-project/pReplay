@@ -123,7 +123,7 @@ struct phttpget_request_queue phttpget_requests_pending;
 /* PHTTPGET STUFF END */
 
 /* a handle to number lookup, highly ineffective when we do many
-   transfers... */ 
+   transfers... */
 static int hnd2num(CURL *hnd)
 {
   int i;
@@ -131,56 +131,56 @@ static int hnd2num(CURL *hnd)
     if(curl_hnd[i] == hnd)
       return i;
   }
-  return 0; /* weird, but just a fail-safe */ 
+  return 0; /* weird, but just a fail-safe */
 }
- 
+
 static
 void dump(const char *text, int num, unsigned char *ptr, size_t size,
           char nohex)
 {
   size_t i;
   size_t c;
- 
+
   unsigned int width=0x10;
- 
+
   if(nohex)
-    /* without the hex output, we can fit more on screen */ 
+    /* without the hex output, we can fit more on screen */
     width = 0x40;
- 
+
   fprintf(stderr, "%d %s, %ld bytes (0x%lx)\n",
           num, text, (long)size, (long)size);
- 
+
   for(i=0; i<size; i+= width) {
- 
+
     fprintf(stderr, "%4.4lx: ", (long)i);
- 
+
     if(!nohex) {
-      /* hex not disabled, show it */ 
+      /* hex not disabled, show it */
       for(c = 0; c < width; c++)
         if(i+c < size)
           fprintf(stderr, "%02x ", ptr[i+c]);
         else
           fputs("   ", stderr);
     }
- 
+
     for(c = 0; (c < width) && (i+c < size); c++) {
-      /* check for 0D0A; if found, skip past and start a new line of output */ 
+      /* check for 0D0A; if found, skip past and start a new line of output */
       if(nohex && (i+c+1 < size) && ptr[i+c]==0x0D && ptr[i+c+1]==0x0A) {
         i+=(c+2-width);
         break;
       }
       fprintf(stderr, "%c",
               (ptr[i+c]>=0x20) && (ptr[i+c]<0x80)?ptr[i+c]:'.');
-      /* check again for 0D0A, to avoid an extra \n if it's at width */ 
+      /* check again for 0D0A, to avoid an extra \n if it's at width */
       if(nohex && (i+c+2 < size) && ptr[i+c+1]==0x0D && ptr[i+c+2]==0x0A) {
         i+=(c+3-width);
         break;
       }
     }
-    fputc('\n', stderr); /* newline */ 
+    fputc('\n', stderr); /* newline */
   }
 }
- 
+
 static
 int my_trace(CURL *handle, curl_infotype type,
              char *data, size_t size,
@@ -188,14 +188,14 @@ int my_trace(CURL *handle, curl_infotype type,
 {
   const char *text;
   int num = hnd2num(handle);
-  (void)handle; /* prevent compiler warning */ 
+  (void)handle; /* prevent compiler warning */
   (void)userp;
   switch(type) {
   case CURLINFO_TEXT:
     fprintf(stderr, "== %d Info: %s", num, data);
-  default: /* in case a new one is introduced to shock us */ 
+  default: /* in case a new one is introduced to shock us */
     return 0;
- 
+
   case CURLINFO_HEADER_OUT:
     text = "=> Send header";
     break;
@@ -215,7 +215,7 @@ int my_trace(CURL *handle, curl_infotype type,
     text = "<= Recv SSL data";
     break;
   }
- 
+
   dump(text, num, (unsigned char *)data, size, 1);
   return 0;
 }
@@ -401,18 +401,18 @@ run_worker(void *arg)
         page_size+=(long)bytes;
 
         object_count++;
-	 if (json_output == 1) {
+        if (json_output == 1) {
             if (first_object == 0) {
                 //printf("{\"S\":%ld,\"T\":%f}",total_bytes, transfer_time);
                 cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
-		time_in_mill = (ts.tv_sec) * 1000 + (ts.tv_usec) / 1000 ;
+                time_in_mill = (ts.tv_sec) * 1000 + (ts.tv_usec) / 1000 ;
                 cJSON_AddNumberToObject(temp_download_size,"S",time_in_mill);
                 cJSON_AddNumberToObject(temp_download_size,"Sz",total_bytes);
                 cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
                 first_object = 1;
             } else {
                 cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
-		time_in_mill = (ts.tv_sec) * 1000 + (ts.tv_usec) / 1000 ;
+                time_in_mill = (ts.tv_sec) * 1000 + (ts.tv_usec) / 1000 ;
                 cJSON_AddNumberToObject(temp_download_size,"S",time_in_mill);
                 cJSON_AddNumberToObject(temp_download_size,"Sz",total_bytes);
                 cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
@@ -575,9 +575,7 @@ phttpget_request_url(void *arg)
     struct timeval time_request;
     struct timeval time_response;
     double end_time = 0.0;
-    uint32_t bytes = 0;
     long total_bytes = 0;
-    long header_bytes = 0;
     double transfer_time = 0.0;
     struct phttpget_request *request = NULL;
     cJSON *obj = NULL;
@@ -684,15 +682,12 @@ phttpget_request_url(void *arg)
 
         if (json_output == 1) {
             if (first_object == 0) {
-                cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
-                cJSON_AddNumberToObject(temp_download_size,"S",total_bytes);
-                cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
                 first_object = 1;
-            } else {
-                cJSON_AddItemToArray(download_size,temp_download_size=cJSON_CreateObject());
-                cJSON_AddNumberToObject(temp_download_size,"S",total_bytes);
-                cJSON_AddNumberToObject(temp_download_size,"T",transfer_time);
             }
+            cJSON_AddItemToArray(download_size,temp_download_size = cJSON_CreateObject());
+            cJSON_AddNumberToObject(temp_download_size,"S", time_request.tv_sec * 1000 + time_request.tv_usec / 1000);
+            cJSON_AddNumberToObject(temp_download_size,"Sz", total_bytes);
+            cJSON_AddNumberToObject(temp_download_size,"T", transfer_time);
         }
 
         if (debug) {
