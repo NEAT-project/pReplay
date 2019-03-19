@@ -3,7 +3,11 @@ used to replay dependency
 trees based page load process
 in todays browser
 
-written by-- Mohd Rajiullah*/
+Author:  Mohammad Rajiullah
+Date: April 2016
+License: GNU General Public License v3
+Developed for use by the EU H2020 NEAT project
+*/
 #define _XOPEN_SOURCE 700
 
 #include <stdio.h>
